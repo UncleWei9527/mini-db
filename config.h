@@ -9,8 +9,9 @@ namespace minidb {
 
     // 定义页的 ID 类型为 32位整数
     using page_id_t = int32_t;
-
+    using frame_id_t = int32_t;
     // 定义一个特殊的常量，表示无效的页号
     inline constexpr page_id_t INVALID_PAGE_ID = -1;
+
 
 } // namespace minidb

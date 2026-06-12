@@ -8,4 +8,6 @@ add_executable(db main.cpp
         value.h
         config.h
         disk_manager.cpp
-        disk_manager.h)
+        disk_manager.h
+        lru_replacer.h
+        lru_replacer.cpp)

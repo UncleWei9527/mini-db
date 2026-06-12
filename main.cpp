@@ -2,17 +2,19 @@
 #include<string>
 #include<iostream>
 #include"disk_manager.h"
+#include"lru_replacer.h"
+#include<cassert>
 int main() {
-    minidb::DiskManager disk_mgr("test.db");
-    std::string buffer(minidb::PAGE_SIZE, 'A');
-    disk_mgr.WritePage(0, buffer);
-    for (int i=0;i<buffer.size();i++) {
-       buffer[i]=rand()%26+'a';
-    }
-    disk_mgr.ReadPage(0,buffer);
-    for (int i=0;i<buffer.size();i++) {
-        if (buffer[i]!='A')
-            throw std::logic_error("read error");
-    }
+    minidb::LRUReplacer lru(3);
+    lru.Unpin(1);
+    lru.Unpin(2);
+    lru.Unpin(0);
+    lru.Pin(2);
+    auto num=lru.Victim();
+    assert(num.has_value()&&num.value()==1);
+    num=lru.Victim();
+    assert(num.has_value()&&num.value()==0);
+    num=lru.Victim();
+    assert(!num.has_value());
     return 0;
 }

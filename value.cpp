@@ -2,27 +2,20 @@
 #include<cassert>
 
 minidb::Value::Value()
-    :value_(std::monostate{})
-{
+    : value_(std::monostate{}) {
     type_id_ = TypeId::INVALID;
 }
 
 minidb::Value::Value(bool value)
-    :value_(value)
-{
-    type_id_ = TypeId::BOOLEAN;
+    : type_id_(TypeId::BOOLEAN), value_(value) {
 }
 
 minidb::Value::Value(int32_t value)
-:value_(value)
-{
-    type_id_ = TypeId::INTEGER;
+    : type_id_(TypeId::INTEGER), value_(value) {
 }
 
 minidb::Value::Value(std::string value)
-    :value_(std::move(value))
-{
-    type_id_ = TypeId::VARCHAR;
+    : type_id_(TypeId::VARCHAR), value_(std::move(value)) {
 }
 
 minidb::TypeId minidb::Value::GetTypeId() const {
@@ -55,8 +48,7 @@ std::string minidb::Value::GetAsString() const {
 }
 
 std::string minidb::Value::ToString() const {
-    return std::visit([]<typename T>(const T& arg) -> std::string {
-
+    return std::visit([]<typename T>(const T &arg) -> std::string {
         if constexpr (std::is_same_v<T, std::monostate>) {
             return "NULL";
         } else if constexpr (std::is_same_v<T, bool>) {

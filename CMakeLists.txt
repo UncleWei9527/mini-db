@@ -5,4 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 add_executable(db main.cpp
         type_id.h
         value.cpp
-        value.h)
+        value.h
+        config.h
+        disk_manager.cpp
+        disk_manager.h)

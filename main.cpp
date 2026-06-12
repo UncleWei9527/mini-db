@@ -1,23 +1,18 @@
 #include"value.h"
 #include<string>
 #include<iostream>
+#include"disk_manager.h"
 int main() {
-    minidb::Value bool_v(false);
-    bool_v.GetAsBool();
-
-    //bool_v.GetAsInt();assert
-    //bool_v.GetAsString();assert
-    minidb::Value str_v(std::string("hello world"));
-    //str_v.GetAsBool();
-    //str_v.GetAsInt();assert
-    str_v.GetAsString();
-    minidb::Value  int_v(12345);
-    //int_v.GetAsBool();
-    int_v.GetAsInt();
-    //int_v.GetAsString();assert
-    std::cout<<bool_v.ToString()<<std::endl;
-    std::cout<<str_v.ToString()<<std::endl;
-    std::cout<<int_v.ToString()<<std::endl;
-
+    minidb::DiskManager disk_mgr("test.db");
+    std::string buffer(minidb::PAGE_SIZE, 'A');
+    disk_mgr.WritePage(0, buffer);
+    for (int i=0;i<buffer.size();i++) {
+       buffer[i]=rand()%26+'a';
+    }
+    disk_mgr.ReadPage(0,buffer);
+    for (int i=0;i<buffer.size();i++) {
+        if (buffer[i]!='A')
+            throw std::logic_error("read error");
+    }
     return 0;
 }

@@ -23,6 +23,7 @@ namespace minidb {
 
         // 构造一个字符串值
         explicit Value(std::string value);
+        explicit Value(const char* value);
         // --- 任务 2：基础观察方法 ---
 
         TypeId GetTypeId() const;
@@ -38,7 +39,9 @@ namespace minidb {
         int32_t GetAsInt() const;
         std::string GetAsString() const;
         std::string ToString()const;
-
+        uint32_t GetStorageSize() const;
+        uint32_t SerializeTo(char *storage) const;
+        static Value DeserializeFrom(const char *storage, TypeId type_id, uint32_t *out_bytes_read);
     private:
         // 记录当前值在数据库层面是什么类型
         TypeId type_id_;

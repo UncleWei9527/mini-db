@@ -76,8 +76,25 @@ void TestBPM() {
 
     std::cout << "\n🎉🎉🎉 太神了！BufferPoolManager 全流程测试通过！" << std::endl;
 }
+#include"tuple.h"
+#include"value.h"
+void TestTuple() {
+    std::vector<Value> values = { Value(1024), Value("Nova"), Value(true) };
+    Tuple t1(values);
+
+    // 2. 准备个内存当盘
+    char buffer[256];
+    t1.SerializeTo(buffer);
+
+    // 3. 从这块无情冷漠的二进制内存中，复活这行数据！
+    std::vector<TypeId> schema = {TypeId::INTEGER, TypeId::VARCHAR, TypeId::BOOLEAN};
+    Tuple t2 = Tuple::DeserializeFrom(buffer, schema);
+    for (const auto&value:t2.GetValues()) {
+        std::cout<<value.ToString()<<std::endl;
+    }
+}
 
 int main() {
-    TestBPM();
-    return 0;
+    //TestBPM();
+    TestTuple();
 }

@@ -13,4 +13,7 @@ add_executable(db main.cpp
         lru_replacer.cpp
         page.h
         buffer_pool_manager.h
-        buffer_pool_manager.cpp)
+        buffer_pool_manager.cpp
+        rid.h
+        tuple.h
+        tuple.cpp)

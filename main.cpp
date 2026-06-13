@@ -3,7 +3,7 @@
 #include <cstring>
 #include "disk_manager.h"
 #include "buffer_pool_manager.h"
-
+#include<format>
 using namespace minidb;
 
 void TestBPM() {
@@ -93,8 +93,69 @@ void TestTuple() {
         std::cout<<value.ToString()<<std::endl;
     }
 }
+#include"table_page.h"
+void TestTablePage() {
+    std::cout << "=== 🚀 开始测试 TablePage (分槽页) ===" << std::endl;
+
+    // 1. 搞一块纯净的物理内存页
+    Page raw_page;
+    TablePage table_page(&raw_page);
+
+    // 初始化为第 8 号数据页
+    table_page.Init(8);
+    std::cout << "[1/5] 初始化成功，当前剩余空间：" << table_page.GetFreeSpaceRemaining() << " 字节\n";
+
+    // 2. 准备 Schema 和测试数据
+    std::vector<TypeId> schema = {TypeId::INTEGER, TypeId::VARCHAR, TypeId::BOOLEAN};
+    Tuple t1({Value(1), Value("Alice"), Value(true)});
+    Tuple t2({Value(2), Value("Bob_Super_Long_Name"), Value(false)});
+
+    // 3. 测试插入数据
+    auto rid1_opt = table_page.InsertTuple(t1);
+    assert(rid1_opt.has_value());
+    RID rid1 = rid1_opt.value();
+    std::cout << "[2/5] 插入 Alice 成功！RID: (页号 " << rid1.GetPageId() << ", 槽号 " << rid1.GetSlotNum() << ")\n";
+
+    auto rid2_opt = table_page.InsertTuple(t2);
+    assert(rid2_opt.has_value());
+    RID rid2 = rid2_opt.value();
+    std::cout << "      插入 Bob 成功！RID: (页号 " << rid2.GetPageId() << ", 槽号 " << rid2.GetSlotNum() << ")\n";
+
+    // 4. 测试精准读取
+    auto fetch_t1 = table_page.GetTuple(rid1, schema);
+    assert(fetch_t1.has_value());
+    assert(fetch_t1->GetValues()[1].GetAsString() == "Alice");
+    std::cout << "[3/5] 根据 RID 读取 Alice 成功，数据完全一致！\n";
+
+    // 5. 测试墓碑机制 (逻辑删除)
+    std::cout << "[4/5] 正在对 Alice 执行逻辑删除 (立墓碑)...\n";
+    bool delete_res = table_page.MarkDelete(rid1);
+    assert(delete_res == true);
+
+    // Alice 应该读不到了
+    auto fetch_deleted = table_page.GetTuple(rid1, schema);
+    assert(!fetch_deleted.has_value());
+
+    // Bob 应该不受任何影响
+    auto fetch_t2 = table_page.GetTuple(rid2, schema);
+    assert(fetch_t2.has_value());
+    assert(fetch_t2->GetValues()[1].GetAsString() == "Bob_Super_Long_Name");
+    std::cout << "      验证通过：Alice 已被删除，Bob 依然存活，且物理游标完美解耦！\n";
+
+    // 6. 测试极限打爆内存
+    std::cout << "[5/5] 正在测试空间耗尽拦截...\n";
+    Tuple giant_tuple({Value(999), Value(std::string(4000, 'X')), Value(false)});
+    auto giant_opt = table_page.InsertTuple(giant_tuple);
+    assert(!giant_opt.has_value()); // 空间不够，必须安全拒绝！
+    std::cout << std::format("      空间耗尽检测成功，超大 Tuple 被完美拦截！{}\n",table_page.GetFreeSpaceRemaining());
+
+    std::cout << "\n🎉🎉🎉 太神了！TablePage 分槽页测试完美通过！" << std::endl;
+}
 
 int main() {
-    //TestBPM();
-    TestTuple();
+    // 屏蔽掉之前的测试，专心跑这一关
+    // TestBPM();
+    // TestTuple();
+    TestTablePage();
+    return 0;
 }

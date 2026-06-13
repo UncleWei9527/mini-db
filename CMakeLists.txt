@@ -16,4 +16,6 @@ add_executable(db main.cpp
         buffer_pool_manager.cpp
         rid.h
         tuple.h
-        tuple.cpp)
+        tuple.cpp
+        table_page.h
+        table_page.cpp)

@@ -8,7 +8,7 @@
 minidb::LRUReplacer::LRUReplacer(size_t num_frames) {
     capacity_=num_frames;
 }
-
+//删除名单中的最早使用的frame
 std::optional<minidb::frame_id_t> minidb::LRUReplacer::Victim() {
     if (!lru_list_.size())return std::nullopt;
 
@@ -19,7 +19,7 @@ std::optional<minidb::frame_id_t> minidb::LRUReplacer::Victim() {
     lru_list_.pop_back();
     return num;
 }
-
+//标记frame为不可删除
 void minidb::LRUReplacer::Pin(frame_id_t frame_id) {
     auto it=lru_hash_.find(frame_id);
     if (it!=lru_hash_.end()) {
@@ -27,7 +27,7 @@ void minidb::LRUReplacer::Pin(frame_id_t frame_id) {
         lru_hash_.erase(it);
     }
 }
-//链表末尾
+//标记frame为可以删除
 void minidb::LRUReplacer::Unpin(frame_id_t frame_id) {
     if (Size()==capacity_)return ;
     auto it=lru_hash_.find(frame_id);

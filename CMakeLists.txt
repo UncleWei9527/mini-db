@@ -10,4 +10,7 @@ add_executable(db main.cpp
         disk_manager.cpp
         disk_manager.h
         lru_replacer.h
-        lru_replacer.cpp)
+        lru_replacer.cpp
+        page.h
+        buffer_pool_manager.h
+        buffer_pool_manager.cpp)

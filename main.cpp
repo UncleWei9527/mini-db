@@ -334,7 +334,7 @@ void TestTokenize() {
     std::cout << "------------------------------------\n";
     std::cout << "🎉 词法分析测试通过！\n";
 }
-#include"Parser.h"
+#include"parser.h"
 void TestParser(const std::string& sql) {
     std::cout << "🔪 正在解析 SQL: [" << sql << "]\n";
     try {
@@ -351,6 +351,59 @@ void TestParser(const std::string& sql) {
         std::cout << "❌ " << e.what() << "\n\n";
     }
 }
+#include"planner.h"
+void TestPlanner() {
+    std::cout << "=== 🚀 mini_db 全链路端到端启动 ===\n\n";
+
+    // 1. 启动底层存储引擎
+    DiskManager disk_mgr("test_end_to_end.db");
+    BufferPoolManager bpm(10, &disk_mgr);
+
+    // 2. 启动系统字典，并手动建两张表
+    Catalog catalog;
+    TableHeap source_table(&bpm);
+    TableHeap target_table(&bpm);
+    catalog.AddTable("users", &source_table);
+    catalog.AddTable("vip_users", &target_table);
+
+    // 给 source_table 塞点老数据作为测试底料
+    source_table.InsertTuple(Tuple({Value(1), Value("Alice")}));
+    source_table.InsertTuple(Tuple({Value(2), Value("Bob")}));
+
+    std::cout << "[系统就绪] 底层引擎与 Catalog 已启动，表已建立。\n";
+    std::cout << "------------------------------------\n";
+    std::string sql = "INSERT INTO vip_users SELECT * FROM users;";
+    std::cout << "▶ 执行 SQL: " << sql << "\n";
+
+    // try {
+        // [阶段 1] 前端解析：SQL -> AST
+        Tokenizer tokenizer(sql);
+        minidb::Parser parser(tokenizer.Tokenize());
+        auto ast = parser.Parse();
+
+        // [阶段 2] 中端规划：AST -> 执行树
+        Planner planner(&catalog);
+        auto executor = planner.Plan(ast.get());
+
+        // [阶段 3] 后端执行：火山喷发！
+        executor->Init();
+        std::optional<Tuple>tuple=std::nullopt;
+        while ( 1) {
+            tuple = executor->Next();
+            if (!tuple.has_value())break;
+            // Insert 算子最后会吐出一个受影响的行数
+            std::cout << "✅ 执行成功！受影响行数: " << tuple->GetValues()[0].GetAsInt() << "\n";
+        }
+    // } catch (const std::exception& e) {
+    //     std::cout << "❌ 致命错误: " << e.what() << "\n";
+    //     return ;
+    // }
+
+    std::cout << "------------------------------------\n";
+    std::cout << "🎉 恭喜！端到端 SQL 引擎链路已完全打通！\n";
+
+    return ;
+}
 int main() {
     // 屏蔽掉之前的测试，专心跑这一关
     // TestBPM();
@@ -360,13 +413,14 @@ int main() {
     //TestTableIterator();
     //TestVolcanoModel();
     //TestTokenize();
-    // 测试 1：标准的 SELECT
-    TestParser("SELECT * FROM users;");
-
-    // 测试 2：复杂的跨表插入 (测试嵌套解析)
-    TestParser("   INSERT   INTO  vip_users  SeLeCT * FROM  users  ;");
-
-    // 测试 3：语法报错测试 (故意漏掉 FROM)
-    TestParser("SELECT * users;");
+    // // 测试 1：标准的 SELECT
+    // TestParser("SELECT * FROM users;");
+    //
+    // // 测试 2：复杂的跨表插入 (测试嵌套解析)
+    // TestParser("   INSERT   INTO  vip_users  SeLeCT * FROM  users  ;");
+    //
+    // // 测试 3：语法报错测试 (故意漏掉 FROM)
+    // TestParser("SELECT * users;");
+    TestPlanner();
     return 0;
 }

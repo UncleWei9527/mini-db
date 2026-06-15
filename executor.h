@@ -15,13 +15,13 @@ namespace minidb {
     };
     class SeqScanExecutor:public AbstractExecutor{
     public:
-        SeqScanExecutor(TableHeap*tb_heap,const std::vector<TypeId> &schema);
+        SeqScanExecutor(TableHeap*tb_heap,std::vector<TypeId> schema);
         void Init()override;
         std::optional<Tuple> Next()override;
         const std::vector<TypeId>& GetOutputSchema() const override ;
     private:
         TableHeap*tb_heap_;
-        const std::vector<TypeId> &schema_;
+        std::vector<TypeId> schema_;
         TableIterator it_;
 
     };

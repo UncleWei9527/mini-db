@@ -4,8 +4,8 @@
 
 #include "executor.h"
 
-minidb::SeqScanExecutor::SeqScanExecutor(TableHeap *tb_heap,const std::vector<TypeId> &schema)
-    :it_(tb_heap->End()),schema_(schema),tb_heap_(tb_heap)
+minidb::SeqScanExecutor::SeqScanExecutor(TableHeap *tb_heap,std::vector<TypeId> schema)
+    :it_(tb_heap->End()),schema_(std::move(schema)),tb_heap_(tb_heap)
 {
 }
 

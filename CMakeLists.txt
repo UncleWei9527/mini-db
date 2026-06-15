@@ -27,5 +27,9 @@ add_executable(db main.cpp
         executor.h
         token.h
         token.cpp
-        Parser.h
-        Parser.cpp)
+        parser.h
+        parser.cpp
+        catalog.h
+        catalog.cpp
+        planner.h
+        planner.cpp)

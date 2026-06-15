@@ -198,11 +198,61 @@ void TestTableHeap() {
     std::cout << "      抽查全部一致！内存调度完美无缺！\n";
     std::cout << "\n🎉🎉🎉 帅炸了！TableHeap 存储引擎全流程跑通！！！" << std::endl;
 }
+void TestTableIterator() {
+    std::cout << "=== 🚀 开始测试 TableIterator (全表扫描) ===" << std::endl;
+
+    DiskManager disk_mgr("test_iterator.db");
+    BufferPoolManager bpm(5, &disk_mgr);
+    TableHeap table(&bpm);
+    std::vector<TypeId> schema = {TypeId::INTEGER, TypeId::VARCHAR};
+    std::vector<RID> rids;
+
+    // 1. 插入 10 条数据
+    std::cout << "[1/3] 插入 10 条数据...\n";
+    for (int i = 0; i < 10; i++) {
+        Tuple t({Value(i), Value("Hero_" + std::to_string(i))});
+        rids.push_back(table.InsertTuple(t).value());
+    }
+
+    // 2. 模拟真实业务：乱序删掉几个数据，制造墓碑！
+    std::cout << "[2/3] 删掉偶数行的数据 (制造空洞)...\n";
+    for (int i = 0; i < 10; i += 2) {
+        // 先 Fetch 出来改成 Delete，由于我们 TableHeap 没暴露 Delete 接口
+        // 我们直接找 TablePage 来删！
+        Page* p = bpm.FetchPage(rids[i].GetPageId());
+        TablePage tp(p);
+        tp.MarkDelete(rids[i]);
+        bpm.UnpinPage(rids[i].GetPageId(), true);
+    }
+
+    // 3. 见证奇迹：C++ 范围 for 循环扫描全表！
+    std::cout << "[3/3] 开始启动检票员，全表扫描...\n";
+    std::cout << "------------------------------------\n";
+
+    int scan_count = 0;
+    // 💡 看这里！由于我们重载了 *, ++, !=，它用起来和 std::vector 一模一样！
+    for (auto it = table.Begin(schema); it != table.End(); ++it) {
+        Tuple tuple = *it;
+        int id = tuple.GetValues()[0].GetAsInt();
+        std::string name = tuple.GetValues()[1].GetAsString();
+
+        std::cout << "扫描到存活数据 -> ID: " << id << " Name: " << name << "\n";
+        scan_count++;
+
+        // 断言：扫出来的一定是奇数，因为偶数都被删了！
+        assert(id % 2 != 0);
+    }
+    std::cout << "------------------------------------\n";
+    assert(scan_count == 5); // 10 个删了 5 个，必须只能扫出 5 个！
+
+    std::cout << "🎉🎉🎉 无懈可击！TableIterator 全表扫描与墓碑跳过完美通过！！！" << std::endl;
+}
 int main() {
     // 屏蔽掉之前的测试，专心跑这一关
     // TestBPM();
     // TestTuple();
    // TestTablePage();
-    TestTableHeap();
+    //TestTableHeap();
+    TestTableIterator();
     return 0;
 }

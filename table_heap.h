@@ -3,10 +3,11 @@
 #include "table_page.h"
 #include "tuple.h"
 #include <optional>
-
+#include"table_iterator.h"
 namespace minidb {
 
     class TableHeap {
+        friend class TableIterator;
     public:
         // 构造函数：开辟一张新表！
         // 它会立刻向 BPM 申请第一页，作为火车的车头。
@@ -21,7 +22,8 @@ namespace minidb {
 
         // 获取这列火车的车头（第一页的页号），后面写全表扫描（SELECT *）时要用！
         page_id_t GetFirstPageId() const { return first_page_id_; }
-
+        TableIterator Begin(const std::vector<TypeId> &schema);
+        TableIterator End();
     private:
         BufferPoolManager *bpm_;
         page_id_t first_page_id_{INVALID_PAGE_ID}; // 车头的门牌号

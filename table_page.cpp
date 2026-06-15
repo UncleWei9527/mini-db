@@ -112,6 +112,7 @@ uint32_t minidb::TablePage::GetFreeSpaceRemaining() const {
 minidb::page_id_t minidb::TablePage::GetNextPageId() const {
     page_id_t next_page_id;
     std::memcpy(&next_page_id,page_->GetData()+OFFSET_NEXT_PAGE_ID,sizeof(page_id_t));
+    return next_page_id;
 }
 
 void minidb::TablePage::SetNextPageId(page_id_t next_page_id) {

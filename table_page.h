@@ -15,6 +15,8 @@ namespace minidb {
         uint32_t GetFreeSpaceRemaining() const;
         page_id_t GetNextPageId() const;
         void SetNextPageId(page_id_t next_page_id);
+        uint32_t GetSlotSize(uint32_t slot_num) const;
+        uint32_t GetNumTuples() const;
     private:
         Page *page_;
 
@@ -33,13 +35,13 @@ namespace minidb {
         uint32_t GetFreeSpacePointer() const;
         void SetFreeSpacePointer(uint32_t ptr);
 
-        uint32_t GetNumTuples() const;
+
         void SetNumTuples(uint32_t num);
 
         // 操作指定的槽位
         void SetSlot(uint32_t slot_num, uint32_t offset, uint32_t size);
         uint32_t GetSlotOffset(uint32_t slot_num) const;
-        uint32_t GetSlotSize(uint32_t slot_num) const;
+
         // 计算公式：空闲空间指针 - (头部大小 + 当前所有槽位占用的大小)
 
     };

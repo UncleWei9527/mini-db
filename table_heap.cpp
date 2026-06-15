@@ -1,5 +1,6 @@
 #include "table_heap.h"
 #include"cassert"
+#include"table_iterator.h"
 namespace minidb {
     TableHeap::TableHeap(BufferPoolManager *bpm) : bpm_(bpm) {
         Page*new_page=bpm->NewPage(&first_page_id_);
@@ -23,6 +24,42 @@ namespace minidb {
         }
         return std::nullopt;
     }
+
+    TableIterator TableHeap::End() {
+        // 永远用 INVALID_PAGE_ID 代表宇宙的尽头
+        return TableIterator(this, RID(INVALID_PAGE_ID, 0),{});
+    }
+
+    TableIterator TableHeap::Begin(const std::vector<TypeId> &schema) {
+        page_id_t curr_page_id = first_page_id_;
+        if (curr_page_id == INVALID_PAGE_ID) {
+            return End();
+        }
+        Page *page = bpm_->FetchPage(curr_page_id);
+        while (page != nullptr) {
+            TablePage table_page(page);
+
+            for (uint32_t i = 0; i < table_page.GetNumTuples(); i++) {
+                if (table_page.GetSlotSize(i) > 0) {
+                    bpm_->UnpinPage(curr_page_id, false);
+                    return TableIterator(this, RID(curr_page_id, i), schema);
+                }
+            }
+
+            page_id_t next_page_id = table_page.GetNextPageId();
+            bpm_->UnpinPage(curr_page_id, false);
+
+            curr_page_id = next_page_id;
+            if (curr_page_id != INVALID_PAGE_ID) {
+                page = bpm_->FetchPage(curr_page_id);
+            } else {
+                page = nullptr;
+            }
+        }
+
+        return End();
+    }
+
     std::optional<RID> TableHeap::InsertTuple(const Tuple &tuple) {
         // 1. 尝试上末班车
         Page* page = bpm_->FetchPage(last_page_id_);

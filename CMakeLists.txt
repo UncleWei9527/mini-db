@@ -20,4 +20,6 @@ add_executable(db main.cpp
         table_page.h
         table_page.cpp
         table_heap.h
-        table_heap.cpp)
+        table_heap.cpp
+        table_iterator.h
+        table_iterator.cpp)

@@ -20,7 +20,7 @@ namespace minidb {
         // 🌟 核心 3：判等运算符 (it == end)。判断遍历是不是结束了
         bool operator==(const TableIterator &itr) const;
         bool operator!=(const TableIterator &itr) const;
-
+        RID GetRid()const;
     private:
         TableHeap *table_heap_; // 迭代器需要找表堆要数据
         RID rid_;               // 迭代器当前所在的坐标

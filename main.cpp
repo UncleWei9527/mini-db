@@ -247,12 +247,126 @@ void TestTableIterator() {
 
     std::cout << "🎉🎉🎉 无懈可击！TableIterator 全表扫描与墓碑跳过完美通过！！！" << std::endl;
 }
+#include"executor.h"
+void TestVolcanoModel() {
+    std::cout << "=== 🌋 开始测试 火山模型执行引擎 ===" << std::endl;
+
+    // 0. 准备底层环境
+    DiskManager disk_mgr("test_volcano.db");
+    BufferPoolManager bpm(10, &disk_mgr);
+
+    // 我们准备两张表：
+    // t1_source 是源表，里面有老数据。
+    // t2_target 是新表，一开始是空的。
+    TableHeap t1_source(&bpm);
+    TableHeap t2_target(&bpm);
+    std::vector<TypeId> schema = {TypeId::INTEGER, TypeId::VARCHAR};
+
+    // 先给源表随便造点老数据
+    t1_source.InsertTuple(Tuple({Value(100), Value("Apple")}));
+    t1_source.InsertTuple(Tuple({Value(200), Value("Banana")}));
+    t1_source.InsertTuple(Tuple({Value(300), Value("Cherry")}));
+    std::cout << "[1/4] 源表 t1 数据已准备完毕 (3 行)！\n";
+
+    // ---------------------------------------------------------
+    // 🧱 核心：引擎搭积木！
+    // 模拟的 SQL 语句：INSERT INTO t2_target SELECT * FROM t1_source;
+    // ---------------------------------------------------------
+
+    // 第一块积木：全表扫描源表
+    SeqScanExecutor scan_node(&t1_source, schema);
+
+    // 第二块积木：把源表的数据插进目标表
+    // 看！它把 scan_node 当做了自己的孩子传了进去！
+    InsertExecutor insert_node(&scan_node, &t2_target);
+
+    std::cout << "[2/4] 执行树 (Execution Tree) 拼装完毕！\n";
+
+    // ---------------------------------------------------------
+    // 🚀 核心：一键启动火山喷发！
+    // ---------------------------------------------------------
+    std::cout << "[3/4] 引擎点火并触发喷发...\n";
+
+    // 引擎永远只跟最顶层的算子打交道！
+    insert_node.Init();
+
+    auto result_tuple = insert_node.Next();
+
+    // 验证战果！
+    assert(result_tuple.has_value()); // 一定会返回汇报记录
+    int inserted_count = result_tuple.value().GetValues()[0].GetAsInt();
+    std::cout << "      Insert 算子汇报：成功搬运了 [" << inserted_count << "] 行数据！\n";
+    assert(inserted_count == 3);
+
+    // 验证结束信号
+    auto end_signal = insert_node.Next();
+    assert(!end_signal.has_value()); // 第二次调用必须返回 nullopt
+
+    // ---------------------------------------------------------
+    // 🔍 验证：去目标表里看看数据是不是真过来了？
+    // ---------------------------------------------------------
+    std::cout << "[4/4] 验证目标表数据...\n";
+    int check_count = 0;
+    for (auto it = t2_target.Begin(schema); it != t2_target.End(); ++it) {
+        check_count++;
+        Tuple t = *it;
+        std::cout << "      目标表收到数据：ID=" << t.GetValues()[0].GetAsInt()
+                  << ", Name=" << t.GetValues()[1].GetAsString() << "\n";
+    }
+    assert(check_count == 3);
+
+    std::cout << "\n🎉🎉🎉 太酷了！火山模型数据流转完美通关！！！" << std::endl;
+}
+#include"token.h"
+void TestTokenize() {
+    std::string sql = "   seLeCt * FRom  users  ; insert INseRT IntO target_table SELECT * FROM source_table;  ";
+
+    std::cout << "🔪 准备切分 SQL: [" << sql << "]\n";
+    std::cout << "------------------------------------\n";
+
+    Tokenizer tokenizer(sql);
+    auto tokens = tokenizer.Tokenize();
+
+    for (const auto& token : tokens) {
+        std::cout <<token.ToString()<<std::endl;
+    }
+
+    std::cout << "------------------------------------\n";
+    std::cout << "🎉 词法分析测试通过！\n";
+}
+#include"Parser.h"
+void TestParser(const std::string& sql) {
+    std::cout << "🔪 正在解析 SQL: [" << sql << "]\n";
+    try {
+        Tokenizer tokenizer(sql);
+        auto tokens = tokenizer.Tokenize();
+
+        Parser parser(tokens);
+        auto ast = parser.Parse();
+
+        std::cout << "🌳 生成语法树 (AST):\n";
+        PrintAST(ast.get());
+        std::cout << "✅ 解析成功！\n\n";
+    } catch (const std::exception& e) {
+        std::cout << "❌ " << e.what() << "\n\n";
+    }
+}
 int main() {
     // 屏蔽掉之前的测试，专心跑这一关
     // TestBPM();
     // TestTuple();
    // TestTablePage();
     //TestTableHeap();
-    TestTableIterator();
+    //TestTableIterator();
+    //TestVolcanoModel();
+    //TestTokenize();
+    // 测试 1：标准的 SELECT
+    TestParser("SELECT * FROM users;");
+
+    // 测试 2：复杂的跨表插入 (测试嵌套解析)
+    TestParser("   INSERT   INTO  vip_users  SeLeCT * FROM  users  ;");
+
+    // 测试 3：语法报错测试 (故意漏掉 FROM)
+    TestParser("SELECT * users;");
     return 0;
 }

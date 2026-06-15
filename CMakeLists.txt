@@ -22,4 +22,10 @@ add_executable(db main.cpp
         table_heap.h
         table_heap.cpp
         table_iterator.h
-        table_iterator.cpp)
+        table_iterator.cpp
+        executor.cpp
+        executor.h
+        token.h
+        token.cpp
+        Parser.h
+        Parser.cpp)

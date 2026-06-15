@@ -50,4 +50,7 @@ namespace minidb {
         return rid_!=itr.rid_;
     }
 
+    RID TableIterator::GetRid() const {
+        return rid_;
+    }
 }

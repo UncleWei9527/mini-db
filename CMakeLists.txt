@@ -18,4 +18,6 @@ add_executable(db main.cpp
         tuple.h
         tuple.cpp
         table_page.h
-        table_page.cpp)
+        table_page.cpp
+        table_heap.h
+        table_heap.cpp)

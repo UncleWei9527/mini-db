@@ -6,7 +6,7 @@
 #include "config.h"
 
 namespace minidb {
-
+    //管理页的创建与读写
     class DiskManager {
     public:
         // 构造函数：打开或创建一个指定名字的数据库文件（例如 "mini_db.db"）

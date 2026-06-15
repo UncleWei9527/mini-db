@@ -19,8 +19,7 @@ void minidb::TablePage::Init(page_id_t page_id, page_id_t prev_page_id) {
 
     std::memcpy(data+OFFSET_PAGE_ID,&page_id,sizeof(page_id));
     std::memcpy(data+OFFSET_PREV_PAGE_ID,&prev_page_id,sizeof(prev_page_id) );
-    page_id_t next_page_id = INVALID_PAGE_ID;
-    std::memcpy(data+OFFSET_NEXT_PAGE_ID, &next_page_id, sizeof(next_page_id));
+    SetNextPageId(INVALID_PAGE_ID);
     SetFreeSpacePointer(PAGE_SIZE);
     SetNumTuples(0);
 }
@@ -108,4 +107,13 @@ uint32_t minidb::TablePage::GetFreeSpaceRemaining() const {
 
     uint32_t free_space=GetFreeSpacePointer();
     return free_space-GetNumTuples()*SLOT_SIZE-HEADER_SIZE;
+}
+
+minidb::page_id_t minidb::TablePage::GetNextPageId() const {
+    page_id_t next_page_id;
+    std::memcpy(&next_page_id,page_->GetData()+OFFSET_NEXT_PAGE_ID,sizeof(page_id_t));
+}
+
+void minidb::TablePage::SetNextPageId(page_id_t next_page_id) {
+    std::memcpy(page_->GetData()+OFFSET_NEXT_PAGE_ID,&next_page_id,sizeof(page_id_t));
 }

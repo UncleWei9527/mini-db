@@ -8,7 +8,7 @@
 minidb::LRUReplacer::LRUReplacer(size_t num_frames) {
     capacity_=num_frames;
 }
-//删除名单中的最早使用的frame
+//删除名单中的最早使用的frame 返回删除的槽(没有nullopt)
 std::optional<minidb::frame_id_t> minidb::LRUReplacer::Victim() {
     if (!lru_list_.size())return std::nullopt;
 

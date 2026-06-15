@@ -10,12 +10,14 @@ minidb::BufferPoolManager::BufferPoolManager(size_t pool_size, DiskManager *disk
 }
 
 minidb::BufferPoolManager::~BufferPoolManager() {
-
-    // for (auto it=page_table_.begin();it!=page_table_.end();it++) {
-    //     if (pages_[it->second].IsDirty()) {
-    //         FlushPage()
-    //     }
-    // }
+    //把脏页写回
+    for (auto it=page_table_.begin();it!=page_table_.end();it++) {
+        page_id_t page_id=it->first;
+        frame_id_t frame_id=it->second;
+        if (pages_[frame_id].IsDirty()) {
+            FlushPage(page_id);
+        }
+    }
 }
 //获取页
 minidb::Page * minidb::BufferPoolManager::FetchPage(page_id_t page_id) {
@@ -38,6 +40,7 @@ minidb::Page * minidb::BufferPoolManager::FetchPage(page_id_t page_id) {
         page_table_[page_id]=frame_id;
         page.pin_count_=1;//引用次数为1
         page.is_dirty_=false;
+        page.page_id_=page_id;
         //将这个帧从删除名单移除
         replacer_.Pin(frame_id);
         return &page;
@@ -47,7 +50,7 @@ minidb::Page * minidb::BufferPoolManager::FetchPage(page_id_t page_id) {
 }
 //申请新的页
 minidb::Page * minidb::BufferPoolManager::NewPage(page_id_t *out_page_id) {
-    //开辟新的页 ->查找是否有空闲帧 ->物理开辟页
+    //查找是否有空闲帧 ->(有剩余的内存)->物理开辟页
     std::optional<frame_id_t> opt_frame = FindVictimOrFreeFrame();
     if (!opt_frame.has_value()) {
         return nullptr; // 内存爆满
@@ -68,7 +71,7 @@ minidb::Page * minidb::BufferPoolManager::NewPage(page_id_t *out_page_id) {
 
     return &page;
 }
-
+//标记某页不被使用了
 bool minidb::BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
     auto it=page_table_.find(page_id);
     if (it==page_table_.end())return false;
@@ -93,7 +96,7 @@ bool minidb::BufferPoolManager::FlushPage(page_id_t page_id) {
     disk_manager_->WritePage( page_id,std::span<const char>(page.GetData(), PAGE_SIZE));
     return true;
 }
-
+//查找空余的内存帧 ，如果没有lru替换
 std::optional<minidb::frame_id_t> minidb::BufferPoolManager::FindVictimOrFreeFrame() {
     //判断我们物理缓存是否还有空间 没有的话要排除一帧
     if (free_list_.size()) {

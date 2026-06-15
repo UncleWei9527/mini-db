@@ -7,22 +7,14 @@
 namespace minidb {
     class TablePage {
     public:
-        // 零拷贝包装：把基础 Page 指针包装起来操作
         explicit TablePage(Page *page) : page_(page) {}
-
-        // 🌟 核心：初始化一个全新的白板页
         void Init(page_id_t page_id, page_id_t prev_page_id = INVALID_PAGE_ID);
-
-        // 🌟 核心：往页里插入一行数据
-        // 成功返回它的 RID (包含新生成的 slot_num)。如果这页空间不够了，返回 std::nullopt
         std::optional<RID> InsertTuple(const Tuple &tuple);
-
-        // 🌟 核心：读出一行数据
         std::optional<Tuple> GetTuple(const RID &rid, const std::vector<TypeId> &schema) const;
-
-        // 🌟 核心：逻辑删除一行数据
         bool MarkDelete(const RID &rid);
         uint32_t GetFreeSpaceRemaining() const;
+        page_id_t GetNextPageId() const;
+        void SetNextPageId(page_id_t next_page_id);
     private:
         Page *page_;
 

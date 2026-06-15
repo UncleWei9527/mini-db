@@ -151,11 +151,58 @@ void TestTablePage() {
 
     std::cout << "\n🎉🎉🎉 太神了！TablePage 分槽页测试完美通过！" << std::endl;
 }
+#include"table_heap.h"
+void TestTableHeap() {
+    std::cout << "=== 🚀 开始测试 TableHeap (表堆联动大测试) ===" << std::endl;
 
+    // 1. 搞一个极其恶劣的内存环境：自习室只有 3 个座位！
+    DiskManager disk_mgr("test_table_heap.db");
+    BufferPoolManager bpm(3, &disk_mgr);
+
+    // 2. 创世：开辟一张表
+    TableHeap table(&bpm);
+    std::cout << "[1/4] 表堆初始化成功，首尾相连在 Page " << table.GetFirstPageId() << "\n";
+
+    // 3. 暴力测试：疯狂插入 1000 行数据！
+    // 我们的每行数据大概 20 多字节，4KB 的页大概能装 100 多行。
+    // 1000 行一定会跨越大概 8 到 10 个页！
+    std::cout << "[2/4] 开始疯狂插入 1000 条数据...\n";
+    std::vector<RID> rids;
+    std::vector<TypeId> schema = {TypeId::INTEGER, TypeId::VARCHAR};
+
+    for (int i = 0; i < 1000; i++) {
+        Tuple t({Value(i), Value("User_" + std::to_string(i))});
+        auto rid_opt = table.InsertTuple(t);
+        assert(rid_opt.has_value()); // 必须每一行都能插进去！
+        rids.push_back(rid_opt.value());
+    }
+
+    std::cout << "[3/4] 1000 条数据插入完毕！最后一条数据的 RID: (页号 "
+              << rids.back().GetPageId() << ", 槽号 " << rids.back().GetSlotNum() << ")\n";
+
+    // 4. 精准打击：随机抽取刚才的 RID 进行核对，验证历史页是不是被成功淘汰和重载了！
+    std::cout << "[4/4] 正在跨页随机抽查读取数据...\n";
+
+    // 查第 0 条
+    auto t_0 = table.GetTuple(rids[0], schema);
+    assert(t_0.has_value() && t_0->GetValues()[0].GetAsInt() == 0);
+
+    // 查第 500 条
+    auto t_500 = table.GetTuple(rids[500], schema);
+    assert(t_500.has_value() && t_500->GetValues()[0].GetAsInt() == 500);
+
+    // 查第 999 条
+    auto t_999 = table.GetTuple(rids[999], schema);
+    assert(t_999.has_value() && t_999->GetValues()[0].GetAsInt() == 999);
+
+    std::cout << "      抽查全部一致！内存调度完美无缺！\n";
+    std::cout << "\n🎉🎉🎉 帅炸了！TableHeap 存储引擎全流程跑通！！！" << std::endl;
+}
 int main() {
     // 屏蔽掉之前的测试，专心跑这一关
     // TestBPM();
     // TestTuple();
-    TestTablePage();
+   // TestTablePage();
+    TestTableHeap();
     return 0;
 }

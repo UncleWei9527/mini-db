@@ -1,12 +1,14 @@
 #pragma  once
 #include<vector>
 #include"token.h"
+#include"catalog.h"
 #include<memory>
 #include<iostream>
 namespace minidb {
     enum class StatementType {
         SELECT,
-        INSERT
+        INSERT,
+        CREATE_TABLE
     };
     struct SQLStatement {
         SQLStatement(StatementType type);
@@ -24,11 +26,12 @@ namespace minidb {
         std::string table_name_;
         std::unique_ptr<SelectStatement>select_query_;
     };
+    struct CreateTableStatement:public SQLStatement {
+        CreateTableStatement(std::string table_name,std::vector<Column>columns);
+        std::string table_name_;
+        std::vector<Column>columns_;
+    };
     void PrintAST(SQLStatement* ast, int indent = 0) ;
-
-
-
-
     class Parser {
     public:
         explicit Parser(const std::vector<Token>& tokens) : tokens_(tokens), cursor_(0) {}
@@ -47,5 +50,6 @@ namespace minidb {
         // --- 具体语句的推导逻辑 (递归下降逻辑) ---
         std::unique_ptr<SelectStatement> ParseSelect();
         std::unique_ptr<InsertStatement> ParseInsert();
+        std::unique_ptr<CreateTableStatement>ParseCreateTable();
     };
 }

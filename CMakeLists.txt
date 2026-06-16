@@ -32,4 +32,8 @@ add_executable(db main.cpp
         catalog.h
         catalog.cpp
         planner.h
-        planner.cpp)
+        planner.cpp
+        execution_engine.cpp
+        execution_engine.h
+        shell.h
+        shell.cpp)

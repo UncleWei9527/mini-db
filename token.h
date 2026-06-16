@@ -8,6 +8,14 @@ namespace minidb {
         KW_FROM,
         KW_INSERT,
         KW_INTO,
+        KW_CREATE,
+        KW_TABLE,
+        KW_INT,
+        KW_VARCHAR,
+        KW_BOOL,
+        TK_LPAREN,//(
+        TK_RPAREN,// )
+        TK_COMMA,
         TK_STAR,    // *
         TK_SEMI,    // ;
         IDENTIFIER,     // 表名或列名，比如 users

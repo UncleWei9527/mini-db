@@ -25,7 +25,7 @@ namespace minidb {
         // 🌟 核心：序列化整行数据（遍历 values_，挨个调用 Value 的 SerializeTo）
         // 注意：存完一个 Value 后，storage 指针要往前移动对应的字节数！
         void SerializeTo(char *storage) const;
-
+        std::string ToString()const;
         // 🌟 核心：反序列化整行数据
         // schema 是表结构，告诉我们这行应该有哪几个类型（比如 [INT, VARCHAR, BOOLEAN]）
         static Tuple DeserializeFrom(const char *storage, const std::vector<TypeId> &schema);

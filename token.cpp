@@ -62,6 +62,11 @@ minidb::Token minidb::Tokenizer::ConsumeKeywordOrIdentifier() {
     if (upper_text == "FROM") return {TokenType::KW_FROM, upper_text};
     if (upper_text == "INSERT") return {TokenType::KW_INSERT, upper_text};
     if (upper_text == "INTO") return {TokenType::KW_INTO, upper_text};
+    if (upper_text == "CREATE") return {TokenType::KW_CREATE, upper_text};
+    if (upper_text == "TABLE") return {TokenType::KW_TABLE, upper_text};
+    if (upper_text == "INT" || upper_text == "INTEGER") return {TokenType::KW_INT, upper_text};
+    if (upper_text == "VARCHAR") return {TokenType::KW_VARCHAR, upper_text};
+    if (upper_text=="BOOL")return {TokenType::KW_BOOL,upper_text};
     return {TokenType::IDENTIFIER, text};
 }
 
@@ -70,6 +75,9 @@ minidb::Token minidb::Tokenizer::ConsumeSymbol() {
     switch (c) {
         case '*':return {TokenType::TK_STAR,"*"};
         case ';':return {TokenType::TK_SEMI,";"};
+        case '(':return {TokenType::TK_LPAREN,"("};
+        case ')':return {TokenType::TK_RPAREN,")"};
+        case ',':return {TokenType::TK_COMMA,","};
     }
     throw std::runtime_error(std::string("Lexer error: Unexpected character '") + c + "'");
 }

@@ -2,7 +2,7 @@
 // Created by wjh on 2026/6/15.
 //
 #include"parser.h"
-
+#include<map>
 minidb::SQLStatement::SQLStatement(StatementType type)
     :type_(type)
 {
@@ -24,6 +24,12 @@ minidb::InsertStatement::InsertStatement(
 {
 }
 
+minidb::CreateTableStatement::CreateTableStatement(std::string table_name, std::vector<Column> columns)
+    :SQLStatement(StatementType::CREATE_TABLE),table_name_(table_name),columns_(std::move(columns))
+{
+
+}
+
 std::unique_ptr<minidb::SQLStatement> minidb::Parser::Parse() {
     TokenType first_type = Peek().type_;
     std::unique_ptr<SQLStatement> ast = nullptr;
@@ -32,7 +38,10 @@ std::unique_ptr<minidb::SQLStatement> minidb::Parser::Parse() {
         ast = ParseSelect();
     } else if (first_type == TokenType::KW_INSERT) {
         ast = ParseInsert();
-    } else {
+    }else if (first_type==TokenType::KW_CREATE) {
+        ast=ParseCreateTable();
+    }
+    else {
         throw std::runtime_error("Syntax Error: Unsupported statement starting with '" + Peek().text_ + "'");
     }
     if (Peek().type_ == TokenType::TK_SEMI) {
@@ -91,6 +100,46 @@ std::unique_ptr<minidb::InsertStatement> minidb::Parser::ParseInsert() {
     return std::make_unique<InsertStatement>(table_name_token.text_,std::move(select_query));
 }
 
+std::unique_ptr<minidb::CreateTableStatement> minidb::Parser::ParseCreateTable() {
+    Consume(TokenType::KW_CREATE, "Expected 'CREATE'");
+    Consume(TokenType::KW_TABLE, "Expected 'TABLE' after 'CREATE'");
+    std::string table_name=Consume(TokenType::IDENTIFIER, "Expected table name").text_;
+    Consume(TokenType::TK_LPAREN, "Expected '(' after table name");
+    std::vector<Column>columns;
+    while (true) {
+        // 解析列名
+        std::string col_name = Consume(TokenType::IDENTIFIER, "Expected column name").text_;
+
+        // 解析列类型
+        TypeId col_type;
+        Token type_token = Advance();
+        if (type_token.type_ == TokenType::KW_INT) {
+            col_type = TypeId::INTEGER;
+        } else if (type_token.type_ == TokenType::KW_VARCHAR) {
+            col_type = TypeId::VARCHAR;
+        }else if (type_token.type_==TokenType::KW_BOOL) {
+            col_type=TypeId::BOOLEAN;
+        }
+        else {
+            throw std::runtime_error("Syntax Error: Unsupported column type '" + type_token.text_ + "'");
+        }
+
+        // 保存列定义
+        columns.emplace_back(col_name, col_type);
+
+        // 判断是否还有下一列
+        if (Peek().type_ == TokenType::TK_COMMA) {
+            Advance(); // 吃掉逗号，继续循环
+        } else if (Peek().type_ == TokenType::TK_RPAREN) {
+            break;     // 遇到右括号，列定义结束
+        } else {
+            throw std::runtime_error("Syntax Error: Expected ',' or ')' in column definition");
+        }
+    }
+    Consume(TokenType::TK_RPAREN, "Expected ')' at the end of column definition");
+    return std::make_unique<CreateTableStatement>(table_name,columns);
+}
+
 void minidb::PrintAST(SQLStatement *ast, int indent)
 {
     std::string prefix(indent, ' ');
@@ -102,5 +151,20 @@ void minidb::PrintAST(SQLStatement *ast, int indent)
         std::cout << prefix << "[InsertStatement] 写入目标表: " << ins->table_name_ << "\n";
         std::cout << prefix << "  └── 数据来源子节点:\n";
         PrintAST(ins->select_query_.get(), indent + 6);
+    }
+    else if (ast->GetType()==StatementType::CREATE_TABLE) {
+        static std::map<TypeId,std::string>type_strs={
+            {TypeId::INTEGER,"INT"},
+            {TypeId::BOOLEAN,"BOOL"},
+            {TypeId::VARCHAR,"VARCHAR"}
+        };
+        auto create_stmt = static_cast<CreateTableStatement*>(ast);
+        std::cout << prefix << "[CreateTableStatement] 表名: " << create_stmt->table_name_ << "\n";
+        std::cout << prefix << "  └── 列定义:\n";
+
+        for (const auto& col : create_stmt->columns_) {
+            std::string type_str = type_strs[col.column_type_];
+            std::cout << prefix << "      - " << col.column_name_ << " [" << type_str << "]\n";
+        }
     }
 }

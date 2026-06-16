@@ -13,14 +13,13 @@ std::unique_ptr<minidb::AbstractExecutor> minidb::Planner::Plan(SQLStatement *as
 }
 
 std::unique_ptr<minidb::AbstractExecutor> minidb::Planner::PlanSelect(SelectStatement *stmt) {
-    TableHeap *table = catalog_->GetTable(stmt->table_name_);
-    //todo:add create table
-    std::vector<TypeId> schema = {TypeId::INTEGER, TypeId::VARCHAR};
-    return std::make_unique<SeqScanExecutor>(table, schema);
+    TableHeap *table = catalog_->GetTableHeap(stmt->table_name_);
+    const std::vector<TypeId>&type_ids=catalog_->GetSchema(stmt->table_name_).GetSchemaType();
+    return std::make_unique<SeqScanExecutor>(table, type_ids);
 }
 
 std::unique_ptr<minidb::AbstractExecutor> minidb::Planner::PlanInsert(InsertStatement *stmt) {
-    TableHeap *target_table = catalog_->GetTable(stmt->table_name_);
+    TableHeap *target_table = catalog_->GetTableHeap(stmt->table_name_);
     std::unique_ptr<AbstractExecutor> child = Plan(stmt->select_query_.get());
     return std::make_unique<InsertExecutor>(child.release(), target_table);
 }

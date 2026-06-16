@@ -23,12 +23,9 @@ std::optional<minidb::Tuple> minidb::SeqScanExecutor::Next() {
     return std::nullopt;
 }
 
-const std::vector<minidb::TypeId> & minidb::SeqScanExecutor::GetOutputSchema() const {
-    return schema_;
-}
 
 minidb::InsertExecutor::InsertExecutor(AbstractExecutor *child, TableHeap *target_table)
-    :child_(child),target_table_(target_table),output_schema_{TypeId::INTEGER}
+    :child_(child),target_table_(target_table)
 {
 
 }
@@ -59,6 +56,22 @@ std::optional<minidb::Tuple> minidb::InsertExecutor::Next() {
 
 }
 
-const std::vector<minidb::TypeId> & minidb::InsertExecutor::GetOutputSchema() const {
-    return output_schema_;
+
+minidb::ValuesExecutor::ValuesExecutor(const std::vector<Value> &values)
+    :values_(values)
+{
+
 }
+
+void minidb::ValuesExecutor::Init() {
+    done_ = false; // 状态复位
+}
+
+std::optional<minidb::Tuple> minidb::ValuesExecutor::Next() {
+    if (done_) {
+        return std::nullopt; // 已经吐过一行了，结束
+    }
+    done_ = true;
+    return Tuple(values_);
+}
+

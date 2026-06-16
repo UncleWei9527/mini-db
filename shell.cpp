@@ -2,13 +2,13 @@
 // Created by wjh on 2026/6/16.
 //
 #include"shell.h"
-
+#include<format>
 minidb::Shell::Shell(const std::string &db_file) : disk_mgr_(db_file),
           bpm_(10, &disk_mgr_),
           catalog_(&bpm_),
           planner_(&catalog_)
 {
-    std::cout << "mini_db 启动成功！(数据文件: " << db_file << ")\n";
+    std::cout << std::format("mini_db 启动成功！(数据文件: {})\n",db_file);
     std::cout << "输入 SQL 语句以执行，输入 'exit' 或 'quit' 退出。\n";
 }
 
@@ -45,15 +45,15 @@ void minidb::Shell::ExecuteSQL(const std::string &sql) {
             auto result_set = exec_engine_.Execute(executor.get());
 
             if (ast->GetType() == StatementType::INSERT) {
-                std::cout << "Query OK, " << result_set[0].GetValues()[0].GetAsInt() << " rows affected.\n";
+                std::cout<<std::format("Query OK, {} rows affected.\n",result_set[0].GetValues()[0].GetAsInt());
             } else if (ast->GetType() == StatementType::SELECT) {
                 for (const auto& tuple : result_set) {
                     std::cout << tuple.ToString() << "\n";
                 }
-                std::cout << result_set.size() << " rows in set.\n";
+                std::cout<<std::format("{} rows in set.\n", result_set.size() );
             }
         }
     }catch (const std::exception& e) {
-        std::cout << "ERROR: " << e.what() << "\n";
+        std::cout<<std::format("ERROR: {}\n",e.what());
     }
 }

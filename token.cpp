@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include<format>
+#include<cmath>
 #include<cassert>
 std::string minidb::Token::ToString() const {
     std::string type_str;
@@ -40,6 +41,12 @@ std::vector<minidb::Token> minidb::Tokenizer::Tokenize() {
         if (std::isalpha(c) || c == '_') {
             tokens.push_back(ConsumeKeywordOrIdentifier());
         }
+        else if (std::isdigit(c)) {
+            tokens.push_back(ConsumeNumber());
+        }
+        else if (c=='\'') {
+            tokens.push_back(ConsumeString());
+        }
         else tokens.push_back(ConsumeSymbol());
     }
     return tokens;
@@ -66,7 +73,10 @@ minidb::Token minidb::Tokenizer::ConsumeKeywordOrIdentifier() {
     if (upper_text == "TABLE") return {TokenType::KW_TABLE, upper_text};
     if (upper_text == "INT" || upper_text == "INTEGER") return {TokenType::KW_INT, upper_text};
     if (upper_text == "VARCHAR") return {TokenType::KW_VARCHAR, upper_text};
-    if (upper_text=="BOOL")return {TokenType::KW_BOOL,upper_text};
+    if (upper_text=="BOOL"||upper_text=="BOOLEAN")return {TokenType::KW_BOOL,upper_text};
+    if (upper_text=="TRUE")return {TokenType::KW_TRUE,upper_text};
+    if (upper_text=="FALSE")return {TokenType::KW_FALSE,upper_text};
+    if (upper_text=="VALUES")return {TokenType::KW_VALUES,upper_text};
     return {TokenType::IDENTIFIER, text};
 }
 
@@ -80,6 +90,24 @@ minidb::Token minidb::Tokenizer::ConsumeSymbol() {
         case ',':return {TokenType::TK_COMMA,","};
     }
     throw std::runtime_error(std::string("Lexer error: Unexpected character '") + c + "'");
+}
+
+minidb::Token minidb::Tokenizer::ConsumeNumber() {
+    std::string text;
+    while (std::isdigit(Peek())) {
+        text+=Advance();
+    }
+    return Token{TokenType::NUMBER,text};
+}
+
+minidb::Token minidb::Tokenizer::ConsumeString() {
+    Advance();
+    std::string text;
+    while (Peek()!='\''&&!IsAtEnd()) {
+        text+=Advance();
+    }
+    Advance();
+    return Token{TokenType::STRING,text};
 }
 
 char minidb::Tokenizer::Peek() const {

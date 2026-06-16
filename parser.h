@@ -8,7 +8,8 @@ namespace minidb {
     enum class StatementType {
         SELECT,
         INSERT,
-        CREATE_TABLE
+        CREATE_TABLE,
+
     };
     struct SQLStatement {
         SQLStatement(StatementType type);
@@ -23,8 +24,13 @@ namespace minidb {
     };
     struct InsertStatement:public SQLStatement {
         InsertStatement(std::string table_name,std::unique_ptr<SelectStatement> select_query);
+        // INSERT INTO TABLE SELECT ...
+        InsertStatement(std::string table_name,std::vector<Value>raw_values);
         std::string table_name_;
         std::unique_ptr<SelectStatement>select_query_;
+        //INSERT INTO TABLE VALUES(value1,value2...)
+        bool has_values_;
+        std::vector<Value>raw_values_;
     };
     struct CreateTableStatement:public SQLStatement {
         CreateTableStatement(std::string table_name,std::vector<Column>columns);

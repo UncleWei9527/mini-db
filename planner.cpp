@@ -20,6 +20,11 @@ std::unique_ptr<minidb::AbstractExecutor> minidb::Planner::PlanSelect(SelectStat
 
 std::unique_ptr<minidb::AbstractExecutor> minidb::Planner::PlanInsert(InsertStatement *stmt) {
     TableHeap *target_table = catalog_->GetTableHeap(stmt->table_name_);
-    std::unique_ptr<AbstractExecutor> child = Plan(stmt->select_query_.get());
+    std::unique_ptr<AbstractExecutor> child;
+    if (stmt->has_values_) {
+        child=std::make_unique<ValuesExecutor>(stmt->raw_values_);
+    }
+    else
+     child = Plan(stmt->select_query_.get());
     return std::make_unique<InsertExecutor>(child.release(), target_table);
 }

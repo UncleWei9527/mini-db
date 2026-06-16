@@ -13,12 +13,17 @@ namespace minidb {
         KW_INT,
         KW_VARCHAR,
         KW_BOOL,
+        KW_TRUE,
+        KW_FALSE,
+        KW_VALUES,
         TK_LPAREN,//(
         TK_RPAREN,// )
         TK_COMMA,
         TK_STAR,    // *
         TK_SEMI,    // ;
         IDENTIFIER,     // 表名或列名，比如 users
+        NUMBER,
+        STRING,
         END_OF_FILE     // 解析结束
     };
 
@@ -37,6 +42,8 @@ namespace minidb {
         void SkipWhitespace();
         Token ConsumeKeywordOrIdentifier();
         Token ConsumeSymbol();
+        Token ConsumeNumber();
+        Token ConsumeString();
         char Peek()const;
         char Advance();
         bool IsAtEnd()const;

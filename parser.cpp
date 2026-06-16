@@ -20,7 +20,13 @@ minidb::SelectStatement::SelectStatement(std::string table_name)
 minidb::InsertStatement::InsertStatement(
     std::string table_name, std::unique_ptr<SelectStatement> select_query)
 :SQLStatement(StatementType::INSERT),table_name_(std::move(table_name))
-,select_query_(std::move(select_query))
+,select_query_(std::move(select_query)),has_values_(false)
+{
+}
+
+minidb::InsertStatement::InsertStatement(std::string table_name, std::vector<Value> raw_values)
+:SQLStatement(StatementType::INSERT),table_name_(std::move(table_name))
+,select_query_(nullptr),raw_values_(std::move(raw_values)),has_values_(true)
 {
 }
 
@@ -86,18 +92,47 @@ std::unique_ptr<minidb::SelectStatement> minidb::Parser::ParseSelect() {
 
 std::unique_ptr<minidb::InsertStatement> minidb::Parser::ParseInsert() {
     TokenType first_type = Peek().type_;
-    std::unique_ptr<SQLStatement> ast = nullptr;
     Consume(TokenType::KW_INSERT, "Expected 'INSERT'");
     Consume(TokenType::KW_INTO, "Expected 'INTO' after 'INSERT'");
-    Token table_name_token = Consume(TokenType::IDENTIFIER, "Expected target table name after 'INTO'");
-    std::unique_ptr<SelectStatement>select_query=nullptr;
+    std::string  table_name =
+        Consume(TokenType::IDENTIFIER, "Expected target table name after 'INTO'").text_;
     if (Peek().type_ == TokenType::KW_SELECT) {
-        select_query = ParseSelect();
-    } else {
-        throw std::runtime_error("Syntax Error: Currently INSERT only supports 'INSERT INTO ... SELECT ...'");
+        std::unique_ptr<SelectStatement> select_query = ParseSelect();
+        return std::make_unique<InsertStatement>(table_name,std::move(select_query));
     }
+    else if (Peek().type_==TokenType::KW_VALUES) {
+        std::vector<Value>values;
+        Consume(TokenType::KW_VALUES, "Expected 'VALUES'");
+        Consume(TokenType::TK_LPAREN, "Expected '(' after VALUES");
+        while (true) {
+            if (Peek().type_ == TokenType::NUMBER) {
+                values.emplace_back(std::stoi(Advance().text_));
+            } else if (Peek().type_ == TokenType::STRING) {
+                values.emplace_back(Advance().text_);
+            }
+            else if (Peek().type_==TokenType::KW_TRUE) {
+                values.emplace_back(true);
+                Advance();
+            }
+            else if (Peek().type_==TokenType::KW_FALSE) {
+                values.emplace_back(false);
+                Advance();
+            }
+            else {
+                throw std::runtime_error("Syntax Error: Only numbers and strings are supported in VALUES");
+            }
 
-    return std::make_unique<InsertStatement>(table_name_token.text_,std::move(select_query));
+            if (Peek().type_ == TokenType::TK_COMMA) {
+                Advance(); // 吃掉逗号继续
+            }
+            if (Peek().type_ == TokenType::TK_RPAREN) {
+                break;     // 遇到右括号结束
+            }
+        }
+        Consume(TokenType::TK_RPAREN, "Expected ')'");
+        return std::make_unique<InsertStatement>(table_name,values);
+    }
+    throw std::runtime_error("Syntax Error: INSERT expects SELECT or VALUES");
 }
 
 std::unique_ptr<minidb::CreateTableStatement> minidb::Parser::ParseCreateTable() {

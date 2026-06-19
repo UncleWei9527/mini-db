@@ -2,6 +2,7 @@
 #include"cassert"
 #include"table_iterator.h"
 namespace minidb {
+    //创造一个表
     TableHeap::TableHeap(BufferPoolManager *bpm) : bpm_(bpm) {
         Page*new_page=bpm->NewPage(&first_page_id_);
         if (!new_page) {
@@ -11,6 +12,11 @@ namespace minidb {
         TablePage first_tb_page(new_page);
         first_tb_page.Init(first_page_id_,INVALID_PAGE_ID);
         bpm_->UnpinPage(first_page_id_,true);
+    }
+    //从文件中序列一个表
+    TableHeap::TableHeap(BufferPoolManager *bpm,page_id_t first_page_id,page_id_t last_page_id)
+        :first_page_id_(first_page_id),last_page_id_(last_page_id),bpm_(bpm)
+    {
     }
 
     // 读取数据
@@ -61,7 +67,6 @@ namespace minidb {
     }
 
     std::optional<RID> TableHeap::InsertTuple(const Tuple &tuple) {
-        // 1. 尝试上末班车
         Page* page = bpm_->FetchPage(last_page_id_);
         if (page == nullptr) {
             return std::nullopt; // 护栏 1：系统彻底没内存了，直接宣告插入失败
@@ -71,34 +76,30 @@ namespace minidb {
         std::optional<RID> rid_opt = tb_page.InsertTuple(tuple);
 
         if (rid_opt.has_value()) {
-            bpm_->UnpinPage(page->GetPageId(), true); // 放开老页，已弄脏
-            return rid_opt; // 护栏 3：直接返回 opt，不要无脑 .value()
+            bpm_->UnpinPage(page->GetPageId(), true);
+            return rid_opt;
         }
 
-        // 2. 末班车满了，强行造新车厢！
         page_id_t new_page_id;
         Page* new_page = bpm_->NewPage(&new_page_id);
 
         if (new_page == nullptr) {
-            // 护栏 2：致命护栏！造不出新车厢了！
-            // 在返回失败之前，必须把刚才捏在手里的老车厢还回去！因为老车厢没写进去，所以是 false (没脏)！
             bpm_->UnpinPage(page->GetPageId(), false);
             return std::nullopt;
         }
 
         TablePage new_tb_page(new_page);
-        new_tb_page.Init(new_page_id, last_page_id_); // 初始化新车厢，指向上一个车厢
+        new_tb_page.Init(new_page_id, last_page_id_);
 
-        tb_page.SetNextPageId(new_page_id); // 老车厢挂上右挂钩
-        bpm_->UnpinPage(page->GetPageId(), true); // 老车厢的挂钩被修改了，弄脏了！释放！
+        tb_page.SetNextPageId(new_page_id);
+        bpm_->UnpinPage(page->GetPageId(), true);
 
-        last_page_id_ = new_page_id; // 记下新的车尾
+        last_page_id_ = new_page_id;
 
-        // 3. 在新车厢安家
         rid_opt = new_tb_page.InsertTuple(tuple);
 
-        bpm_->UnpinPage(new_page_id, true); // 新车厢写进去了，弄脏了！释放！
-        return rid_opt; // 直接返回，如果这数据连全新车厢都塞不下，就顺其自然返回 nullopt
+        bpm_->UnpinPage(new_page_id, true);
+        return rid_opt;
     }
 
 } // namespace minidb

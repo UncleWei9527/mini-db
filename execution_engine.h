@@ -7,7 +7,6 @@ namespace minidb {
     class ExecutionEngine {
     public:
         std::vector<Tuple>Execute(AbstractExecutor*executor);
-        
     };
 }
 

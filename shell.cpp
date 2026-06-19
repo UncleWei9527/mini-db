@@ -12,6 +12,10 @@ minidb::Shell::Shell(const std::string &db_file) : disk_mgr_(db_file),
     std::cout << "输入 SQL 语句以执行，输入 'exit' 或 'quit' 退出。\n";
 }
 
+minidb::Shell::~Shell() {
+
+}
+
 void minidb::Shell::Run() {
     std::string sql;
     while (true) {
@@ -26,6 +30,8 @@ void minidb::Shell::Run() {
         ExecuteSQL(sql);
 
     }
+    catalog_.save();
+
 }
 
 void minidb::Shell::ExecuteSQL(const std::string &sql) {

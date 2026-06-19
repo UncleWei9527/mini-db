@@ -32,9 +32,18 @@ namespace minidb {
         void CreateTable(const std::string &table_name, const Schema &schema);
         TableHeap* GetTableHeap(const std::string &table_name) const;
         const Schema& GetSchema(const std::string &table_name) const;
+        void save()const;
+    private:
+        void SerializeTo(char *dst)const;
+        void DeserializeFrom(const char*src);
     private:
         BufferPoolManager *bpm_;
         std::unordered_map<std::string, std::unique_ptr<TableMetaData>> tables_;
+    private:
+        static constexpr uint32_t MAGIC_NUMBER=9527;
+        static constexpr uint32_t OFFSET_MAGIC_NUMBER=0;
+        static constexpr uint32_t OFFSET_TABLE_NUMBER=4;
+        static constexpr uint32_t OFFSET_TABLE_INFO=8;
     };
 
 } // namespace minidb

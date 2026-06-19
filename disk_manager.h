@@ -17,7 +17,7 @@ namespace minidb {
         void WritePage(page_id_t page_id, std::span<const char> page_data);
         void ReadPage(page_id_t page_id, std::span<char> page_data);
         page_id_t AllocatePage();
-
+        uint32_t GetPageNumber()const;
     private:
         std::string file_name_;
         std::fstream db_io_;

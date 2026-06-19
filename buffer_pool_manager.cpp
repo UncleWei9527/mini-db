@@ -96,6 +96,11 @@ bool minidb::BufferPoolManager::FlushPage(page_id_t page_id) {
     disk_manager_->WritePage( page_id,std::span<const char>(page.GetData(), PAGE_SIZE));
     return true;
 }
+
+uint32_t minidb::BufferPoolManager::GetPageNumber() const {
+    return disk_manager_->GetPageNumber();
+}
+
 //查找空余的内存帧 ，如果没有lru替换
 std::optional<minidb::frame_id_t> minidb::BufferPoolManager::FindVictimOrFreeFrame() {
     //判断我们物理缓存是否还有空间 没有的话要排除一帧

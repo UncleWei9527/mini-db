@@ -11,6 +11,7 @@ namespace minidb {
     class Shell {
     public:
         Shell(const std::string&db_file);
+        ~Shell();
         void Run();
     private:
         void ExecuteSQL(const std::string&sql);

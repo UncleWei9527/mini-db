@@ -23,7 +23,7 @@ namespace minidb {
         Page* NewPage(page_id_t *out_page_id);
         bool UnpinPage(page_id_t page_id, bool is_dirty);
         bool FlushPage(page_id_t page_id);
-
+        uint32_t GetPageNumber()const;
     private:
         std::optional<frame_id_t> FindVictimOrFreeFrame();
 

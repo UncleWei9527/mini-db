@@ -41,3 +41,7 @@ minidb::page_id_t minidb::DiskManager::AllocatePage() {
 
     return next_page_id_++;
 }
+
+uint32_t minidb::DiskManager::GetPageNumber() const {
+    return next_page_id_;
+}

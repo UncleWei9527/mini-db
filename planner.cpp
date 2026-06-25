@@ -10,7 +10,8 @@ std::unique_ptr<minidb::AbstractExecutor> minidb::Planner::Plan(SQLStatement *as
         return PlanInsert(static_cast<InsertStatement*>(ast));
     }else if (ast->GetType()==StatementType::DELETE) {
         return PlanDelete(static_cast<DeleteStatement *>(ast));
-    }
+    }else if (ast->GetType()==StatementType::UPDATE)
+        return PlanUpdate(static_cast<UpdateStatement *>(ast));
     throw std::runtime_error("Planner Error: Unsupported AST node.");
 }
 
@@ -43,4 +44,32 @@ std::unique_ptr<minidb::AbstractExecutor> minidb::Planner::PlanDelete(DeleteStat
         child = std::make_unique<FilterExecutor>(child.release(), stmt->cond_.get(), &catalog_->GetSchema(stmt->table_name_));
     }
     return std::make_unique<DeleteExecutor>(child.release(), tb_hp);
+}
+#include<format>
+std::unique_ptr<minidb::AbstractExecutor> minidb::Planner::PlanUpdate(UpdateStatement *stmt) {
+    TableHeap *tb_hp = catalog_->GetTableHeap(stmt->table_name_);
+    const Schema &schema = catalog_->GetSchema(stmt->table_name_);
+    const std::vector<TypeId>& type_ids = schema.GetSchemaType();
+    std::unique_ptr<AbstractExecutor> child = std::make_unique<SeqScanExecutor>(tb_hp, type_ids);
+    if (stmt->cond_) {
+        child = std::make_unique<FilterExecutor>(child.release(), stmt->cond_.get(), &schema);
+    }
+
+    std::unordered_map<int32_t ,AbstractExpression*>update_attrs;
+    const auto &columns=schema.GetColumns();
+    for (const auto &[col_name,expr_ptr]:stmt->updates_) {
+        uint32_t col_idx=-1;
+        for (uint32_t i=0;i<columns.size();i++) {
+            if (columns[i].column_name_==col_name)
+                {
+                col_idx=i;
+                break;
+                }
+        }
+        if (col_idx==-1) {
+            throw std::runtime_error(std::format("Planner Error: Column '{}' not found",col_name));
+        }
+        update_attrs[col_idx] = expr_ptr.get();
+    }
+    return std::make_unique<UpdateExecutor>(child.release(), tb_hp, &schema, update_attrs);
 }

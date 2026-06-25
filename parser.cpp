@@ -41,6 +41,14 @@ minidb::DeleteStatement::DeleteStatement(std::string table_name, std::unique_ptr
 {
 }
 
+minidb::UpdateStatement::UpdateStatement(std::string table_name,
+    std::vector<std::pair<std::string, std::unique_ptr<AbstractExpression>>> updates,
+    std::unique_ptr<AbstractExpression> cond)
+        :SQLStatement(StatementType::UPDATE),table_name_(table_name),updates_(std::move(updates)),
+cond_(std::move(cond))
+{
+}
+
 std::unique_ptr<minidb::SQLStatement> minidb::Parser::ParseStatement() {
     std::unique_ptr<SQLStatement> ast = nullptr;
 
@@ -50,6 +58,8 @@ std::unique_ptr<minidb::SQLStatement> minidb::Parser::ParseStatement() {
         ast = ParseInsert();
     }else if (Match(TokenType::KW_DELETE)) {
         ast=ParseDelete();
+    }else if (Match(TokenType::KW_UPDATE)) {
+        ast=ParseUpdate();
     }
     else if (Match(TokenType::KW_CREATE)) {
         ast=ParseCreateTable();
@@ -228,6 +238,44 @@ std::unique_ptr<minidb::DeleteStatement> minidb::Parser::ParseDelete() {
 
 }
 
+std::unique_ptr<minidb::UpdateStatement> minidb::Parser::ParseUpdate() {
+    std::string table_name=Consume(TokenType::IDENTIFIER,"Expected 'table name'").text_;
+    Consume(TokenType::KW_SET,"Expected 'set'");
+    std::vector<std::pair<std::string, std::unique_ptr<AbstractExpression>>> updates;
+    while (true) {
+
+        std::string col_name = Consume(TokenType::IDENTIFIER, "Expected column name").text_;
+        Consume(TokenType::TK_EQ, "Expected '='");
+        std::unique_ptr<AbstractExpression> val_expr;
+        //暂时支持常量表达式
+        if (Peek().type_ == TokenType::NUMBER) {
+            val_expr = std::make_unique<ConstantValueExpression>(Value(std::stoi(Advance().text_)));
+        } else if (Peek().type_ == TokenType::STRING) {
+            val_expr = std::make_unique<ConstantValueExpression>(Value(Advance().text_));
+        } else if (Peek().type_ == TokenType::KW_TRUE) {
+            Advance();
+            val_expr = std::make_unique<ConstantValueExpression>(Value(true));
+        } else if (Peek().type_ == TokenType::KW_FALSE) {
+            Advance();
+            val_expr = std::make_unique<ConstantValueExpression>(Value(false));
+        } else {
+            throw std::runtime_error("Syntax Error: Unsupported value type in SET clause");
+        }
+
+        updates.emplace_back(col_name, std::move(val_expr));
+        if (!Match( TokenType::TK_COMMA)) {
+            break;
+        }
+    }
+    std::unique_ptr<AbstractExpression> cond = nullptr;
+    if (Peek().type_ == TokenType::KW_WHERE) {
+        Advance();
+        cond = ParseExpression();
+    }
+
+    return std::make_unique<UpdateStatement>(table_name, std::move(updates), std::move(cond));
+}
+
 std::unique_ptr<minidb::CreateTableStatement> minidb::Parser::ParseCreateTable() {
     Consume(TokenType::KW_TABLE, "Expected 'TABLE' after 'CREATE'");
     std::string table_name=Consume(TokenType::IDENTIFIER, "Expected table name").text_;
@@ -305,6 +353,18 @@ void minidb::PrintAST(SQLStatement *ast, int indent)
         std::cout<<std::format("{}[DeleteStatement] 删除目标行: {}\n",prefix,del->table_name_);
         std::cout<<std::format("{}  └── 筛选条件节点:{}\n",prefix,del->cond_->ToString());
     }
+    else if (ast->GetType()==StatementType::UPDATE) {
+        auto upt = static_cast<UpdateStatement*>(ast);
+
+        std::string update_columns;
+        for (const auto& [column,expr]:upt->updates_) {
+            update_columns+=std::format("SET {} = {}",column,expr->ToString());
+            update_columns+=" ";
+        }
+        std::cout<<std::format("{}[UpdateStatement] 更新目标行: {}\n",prefix,upt->table_name_);
+        std::cout<<std::format("{}  └── 筛选条件节点:{}\n",prefix,upt->cond_?upt->cond_->ToString():"无");
+        std::cout<<std::format("{}  └── 更新节点:{}\n",prefix,update_columns);
+    }
     else if (ast->GetType()==StatementType::CREATE_TABLE) {
         static std::map<TypeId,std::string>type_strs={
             {TypeId::INTEGER,"INT"},
@@ -320,4 +380,5 @@ void minidb::PrintAST(SQLStatement *ast, int indent)
             std::cout << prefix << "      - " << col.column_name_ << " [" << type_str << "]\n";
         }
     }
+
 }

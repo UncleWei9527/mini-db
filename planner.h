@@ -16,6 +16,7 @@ namespace minidb {
         std::unique_ptr<AbstractExecutor> PlanSelect(SelectStatement *stmt) ;
         std::unique_ptr<AbstractExecutor> PlanInsert(InsertStatement *stmt) ;
         std::unique_ptr<AbstractExecutor> PlanDelete(DeleteStatement*stmt);
+        std::unique_ptr<AbstractExecutor> PlanUpdate(UpdateStatement*stmt);
     };
 
 } // namespace minidb

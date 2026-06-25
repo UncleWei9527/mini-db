@@ -59,7 +59,9 @@ void minidb::Shell::ExecuteSQL(const std::string &sql) {
                 }
                 std::cout<<std::format("{} rows in set.\n", result_set.size() );
             }else if (ast->GetType()==StatementType::DELETE) {
-                std::cout<<std::format("Query OK, {} rows deleted.\n",result_set[0].GetValues()[0].GetAsInt());
+                std::cout<<std::format("Delete OK, {} rows deleted.\n",result_set[0].GetValues()[0].GetAsInt());
+            }else if (ast->GetType()==StatementType::UPDATE) {
+                std::cout<<std::format("Update OK, {} rows updated.\n",result_set[0].GetValues()[0].GetAsInt());
             }
 
         }

@@ -79,6 +79,8 @@ minidb::Token minidb::Tokenizer::ConsumeKeywordOrIdentifier() {
     if (upper_text=="VALUES")return {TokenType::KW_VALUES,upper_text};
     if (upper_text=="WHERE")return {TokenType::KW_WHERE,upper_text};
     if (upper_text=="DELETE")return {TokenType::KW_DELETE,upper_text};
+    if (upper_text=="UPDATE")return {TokenType::KW_UPDATE,upper_text};
+    if (upper_text=="SET")return {TokenType::KW_SET,upper_text};
     return {TokenType::IDENTIFIER, text};
 }
 

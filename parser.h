@@ -10,6 +10,7 @@ namespace minidb {
         SELECT,
         INSERT,
         DELETE,
+        UPDATE,
         CREATE_TABLE,
 
     };
@@ -45,7 +46,13 @@ namespace minidb {
         std::string table_name_;
         std::unique_ptr<AbstractExpression>cond_;
     };
-
+    struct UpdateStatement:public SQLStatement {
+        UpdateStatement(std::string table_name,std::vector<std::pair<std::string, std::unique_ptr<AbstractExpression>>> updates,
+            std::unique_ptr<AbstractExpression>cond);
+        std::string table_name_;
+        std::vector<std::pair<std::string, std::unique_ptr<AbstractExpression>>> updates_;
+        std::unique_ptr<AbstractExpression> cond_;
+    };
     void PrintAST(SQLStatement* ast, int indent = 0) ;
     class Parser {
     public:
@@ -66,6 +73,7 @@ namespace minidb {
         std::unique_ptr<SelectStatement> ParseSelect();
         std::unique_ptr<InsertStatement> ParseInsert();
         std::unique_ptr<DeleteStatement>ParseDelete();
+        std::unique_ptr<UpdateStatement>ParseUpdate();
         std::unique_ptr<CreateTableStatement>ParseCreateTable();
 
         // --- 解析表达式

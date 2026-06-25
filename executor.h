@@ -15,12 +15,12 @@ namespace minidb {
     };
     class SeqScanExecutor:public AbstractExecutor{
     public:
-        SeqScanExecutor(TableHeap*tb_heap,std::vector<TypeId> schema);
+        SeqScanExecutor(TableHeap*tb_heap,std::vector<TypeId> type_ids);
         void Init()override;
         std::optional<Tuple> Next()override;
     private:
         TableHeap*tb_heap_;
-        std::vector<TypeId> schema_;
+        std::vector<TypeId> type_ids_;
         TableIterator it_;
 
     };
@@ -63,12 +63,22 @@ namespace minidb {
         std::optional<Tuple> Next() override ;
     private:
         AbstractExecutor*child_;
-        AbstractExpression*predicate_;
-        const Schema*schema_;
         TableHeap*target_table_;
         bool has_report_=false;
     };
-
+    class UpdateExecutor:public AbstractExecutor {
+    public:
+        explicit UpdateExecutor(AbstractExecutor *child, TableHeap *target_table, const Schema *schema,
+                   std::unordered_map<int32_t, AbstractExpression*> updates);
+        void Init()override;
+        std::optional<Tuple>Next()override;
+    private:
+        std::unique_ptr<AbstractExecutor> child_;
+        std::unordered_map<int32_t, AbstractExpression*> updates_;
+        const Schema*schema_;
+        TableHeap*target_table_;
+        bool has_reported_=false;
+    };
 
 
 }

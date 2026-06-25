@@ -4,13 +4,13 @@
 
 #include "executor.h"
 
-minidb::SeqScanExecutor::SeqScanExecutor(TableHeap *tb_heap,std::vector<TypeId> schema)
-    :it_(tb_heap->End()),schema_(std::move(schema)),tb_heap_(tb_heap)
+minidb::SeqScanExecutor::SeqScanExecutor(TableHeap *tb_heap,std::vector<TypeId> type_ids)
+    :it_(tb_heap->End()),type_ids_(std::move(type_ids)),tb_heap_(tb_heap)
 {
 }
 
 void minidb::SeqScanExecutor::Init() {
-    it_=tb_heap_->Begin(schema_);
+    it_=tb_heap_->Begin(type_ids_);
 }
 
 std::optional<minidb::Tuple> minidb::SeqScanExecutor::Next() {
@@ -114,4 +114,37 @@ std::optional<minidb::Tuple> minidb::DeleteExecutor::Next() {
         delete_count++;
     }
     return minidb::Tuple(std::vector<Value> (1,Value(delete_count)));
+}
+
+minidb::UpdateExecutor::UpdateExecutor(AbstractExecutor *child, TableHeap *target_table,
+                                       const Schema *schema,
+                                       std::unordered_map<int32_t, AbstractExpression*> updates)
+    : child_(child), target_table_(target_table), schema_(schema), updates_(std::move(updates)) {}
+void minidb::UpdateExecutor::Init() {
+    child_->Init();
+    has_reported_=false;
+
+}
+
+std::optional<minidb::Tuple> minidb::UpdateExecutor::Next() {
+    if (has_reported_)return std::nullopt;
+    std::vector<Tuple>target_tuples;
+    while (true) {
+        auto tuple=child_->Next();
+        if (!tuple.has_value())break;
+        target_tuples.push_back(tuple.value());
+    }
+    uint32_t update_count=0;
+    for (const auto &old_tuple:target_tuples) {
+        target_table_->MarkDelete(old_tuple.GetRid());
+        std::vector<Value>new_values=old_tuple.GetValues();
+        for (const  auto &[col_idx,expr]:updates_) {
+            new_values[col_idx]=expr->Evaluate(&old_tuple,schema_);
+        }
+        target_table_->InsertTuple(Tuple(new_values));
+        update_count++;
+    }
+    has_reported_=true;
+    return Tuple({Value(static_cast<int32_t>(update_count))});
+
 }

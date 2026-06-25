@@ -30,8 +30,8 @@ minidb::ColumnValueExpression::ColumnValueExpression( const std::string &col_nam
 
 }
 
-minidb::ComparisonExpression::ComparisonExpression(AbstractExpression *left, AbstractExpression *right, CompareOp op)
-    :left_(left),right_(right),op_(op)
+minidb::ComparisonExpression::ComparisonExpression(std::unique_ptr<AbstractExpression>left, std::unique_ptr<AbstractExpression>right, CompareOp op)
+    :left_(std::move(left)),right_(std::move(right)),op_(op)
 {
 
 }
@@ -83,16 +83,21 @@ std::string minidb::ColumnValueExpression::ToString() const {
 }
 
 minidb::Value minidb::ColumnValueExpression::Evaluate(const Tuple *tuple, const Schema *schema) const {
-    const auto &columns=schema->GetColumns();
-    auto it=std::find_if(columns.begin(),columns.end(),
-    [this](const Column&c) {
-        return c.column_name_==col_name_;
+
+    if (cached_col_idx==-1) {
+        const auto &columns=schema->GetColumns();
+        auto it=std::find_if(columns.begin(),columns.end(),
+        [this](const Column&c) {
+            return c.column_name_==col_name_;
+        }
+        );
+
+        if (it!=schema->GetColumns().end()) {
+            cached_col_idx=std::distance(columns.begin(),it);
+        }
+        else throw std::logic_error(std::format("unknown column name {}",col_name_));
     }
-    );
-    uint32_t col_idx=-1;
-    if (it!=schema->GetColumns().end()) {
-        col_idx=std::distance(columns.begin(),it);
-    }
-    else throw std::logic_error(std::format("unknown column name {}",col_name_));
-    return tuple->GetValues()[col_idx];
+
+
+    return tuple->GetValues()[cached_col_idx];
 }

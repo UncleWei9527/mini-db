@@ -1,0 +1,748 @@
+commit fc8554ef2f7d3081fa1011935b1967382117ea5a
+Author: 魏锦辉 <13299836+huihuiyydsyes@user.noreply.gitee.com>
+Date:   Thu Jun 25 14:52:35 2026 +0800
+
+    feat:add cond expression
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index ec9584a..bb10a75 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-cmake_minimum_required(VERSION 3.1)
++cmake_minimum_required(VERSION 4.1)
+ project(db)
+ 
+ set(CMAKE_CXX_STANDARD 20)
+@@ -37,4 +37,6 @@ add_executable(db main.cpp
+         execution_engine.cpp
+         execution_engine.h
+         shell.h
+-        shell.cpp)
++        shell.cpp
++        expression.cpp
++        expression.h)
+diff --git a/catalog.cpp b/catalog.cpp
+index 31c74b8..faf6e50 100644
+--- a/catalog.cpp
++++ b/catalog.cpp
+@@ -83,6 +83,7 @@ void minidb::Catalog::SerializeTo(char *dst) const {
+     //遍历表的名
+     uint32_t offset=OFFSET_TABLE_INFO;
+     for (const auto&[tb_name,tb_meta_data]:tables_ ) {
++        assert(offset < PAGE_SIZE && "Catalog metadata exceeded page size!");
+         //写入表名
+         uint32_t name_len=tb_name.size();
+         std::memcpy(dst+offset,&name_len,sizeof(name_len));
+@@ -104,7 +105,7 @@ void minidb::Catalog::SerializeTo(char *dst) const {
+         offset+=sizeof(column_count);
+         for (const auto&column: schema.GetColumns()) {
+             //写入列的名字
+-            size_t name_len=column.column_name_.size();
++            uint32_t name_len=column.column_name_.size();
+             std::memcpy(dst+offset,&name_len,sizeof(name_len));
+             offset+=sizeof(name_len);
+             std::memcpy(dst+offset,column.column_name_.c_str(),name_len);
+@@ -154,11 +155,11 @@ void minidb::Catalog::DeserializeFrom(const char *src)  {
+         offset+=sizeof(column_count);
+         for (size_t i=0;i<column_count;i++) {
+             //读取列的名字
+-            size_t name_len;
++            uint32_t name_len;
+             std::memcpy(&name_len,src+offset,sizeof(name_len));
+             offset+=sizeof(name_len);
+             std::string column_name;column_name.resize(name_len);
+-            std::memcpy((char*)column_name.c_str(),src+offset,name_len);
++            std::memcpy(column_name.data(),src+offset,name_len);
+             offset+=name_len;
+             //读取列的类型
+             TypeId type_id;
+diff --git a/executor.cpp b/executor.cpp
+index ea6d71c..5224449 100644
+--- a/executor.cpp
++++ b/executor.cpp
+@@ -75,3 +75,23 @@ std::optional<minidb::Tuple> minidb::ValuesExecutor::Next() {
+     return Tuple(values_);
+ }
+ 
++minidb::FilterExecutor::FilterExecutor(AbstractExecutor *child, AbstractExpression *predicate, const Schema *schema)
++    :child_(child),predicate_(predicate),schema_(schema)
++{
++}
++
++void minidb::FilterExecutor::Init() {
++    child_->Init();
++}
++
++std::optional<minidb::Tuple> minidb::FilterExecutor::Next() {
++    while (true) {
++        auto tuple=child_->Next();
++        if (!tuple.has_value())return std::nullopt;
++        Value result=predicate_->Evaluate(&tuple.value(),schema_);
++        if (result.GetAsBool()) {
++            return tuple;
++        }
++    }
++}
++
+diff --git a/executor.h b/executor.h
+index 6fcb466..6ce9dae 100644
+--- a/executor.h
++++ b/executor.h
+@@ -6,6 +6,7 @@
+ #include"table_heap.h"
+ #include"tuple.h"
+ #include"table_iterator.h"
++#include"expression.h"
+ namespace minidb {
+     class AbstractExecutor {
+     public:
+@@ -39,14 +40,25 @@ namespace minidb {
+     public:
+         explicit ValuesExecutor(const std::vector<Value>& values);
+         void Init() override;
+-
+-        // 假设你的 Next 返回的是指针或 optional，这里以返回 std::unique_ptr<Tuple> 为例，
+-        // 具体返回类型请根据你之前设计的 AbstractExecutor 保持一致。
+         std::optional<Tuple> Next() override ;
+     private:
+         std::vector<Value> values_;
+         bool done_ = false;
+     };
++    class FilterExecutor:public AbstractExecutor {
++    public:
++        explicit FilterExecutor(AbstractExecutor*child,AbstractExpression *predicate,const Schema *schema);
++        void Init() override;
++        std::optional<Tuple> Next() override ;
++    private:
++        AbstractExecutor*child_;
++        AbstractExpression*predicate_;
++        const Schema*schema_;
++
++    };
++
++
++
+ }
+ 
+ 
+diff --git a/expression.cpp b/expression.cpp
+new file mode 100644
+index 0000000..d8dee54
+--- /dev/null
++++ b/expression.cpp
+@@ -0,0 +1,98 @@
++//
++// Created by wjh on 2026/6/21.
++//
++
++#include "expression.h"
++#include <vector>
++#include <algorithm>
++#include<format>
++#include<map>
++minidb::ConstantValueExpression::ConstantValueExpression(Value val)
++    :val_(val)
++{
++}
++
++bool minidb::ConstantValueExpression::Valid() const {
++    return val_.GetTypeId()!=TypeId::INVALID;
++}
++
++std::string minidb::ConstantValueExpression::ToString() const {
++    return val_.ToString();
++}
++
++minidb::Value minidb::ConstantValueExpression::Evaluate(const Tuple *tuple, const Schema *schema) const {
++    return val_;
++}
++
++minidb::ColumnValueExpression::ColumnValueExpression( const std::string &col_name)
++    :col_name_(col_name)
++{
++
++}
++
++minidb::ComparisonExpression::ComparisonExpression(AbstractExpression *left, AbstractExpression *right, CompareOp op)
++    :left_(left),right_(right),op_(op)
++{
++
++}
++
++minidb::Value minidb::ComparisonExpression::Evaluate(const Tuple *tuple, const Schema *schema) const {
++    Value left_result=left_->Evaluate(tuple,schema);
++    Value right_result=right_->Evaluate(tuple,schema);
++    switch (op_) {
++        case CompareOp::Eq:
++            return Value(left_result.CompareEQ(right_result));
++        case CompareOp::Ne:
++            return Value(left_result.CompareNEQ(right_result));
++        case CompareOp::Lt:
++            return Value(left_result.CompareLT(right_result));
++        case CompareOp::Gt:
++            return Value(left_result.CompareGT(right_result));
++        case CompareOp::Ge:
++            return Value(left_result.CompareGE(right_result));
++        case CompareOp::Le:
++            return Value(left_result.CompareLE(right_result));
++    }
++    throw std::runtime_error("unreachable ");
++}
++
++bool minidb::ComparisonExpression::Valid() const {
++    return left_->Valid()&&right_->Valid();
++}
++
++std::string minidb::ComparisonExpression::ToString() const {
++    static std::map<CompareOp,std::string>op_strs={
++        {CompareOp::Lt, "<"},
++        {CompareOp::Le, "<="},
++        {CompareOp::Gt, ">"},
++        {CompareOp::Ge, ">="},
++        {CompareOp::Ne, "!="},
++        {CompareOp::Eq,"=="},
++    };
++    return std::format("{}{}{}",left_->ToString(),op_strs[op_],right_->ToString());
++}
++
++bool minidb::ColumnValueExpression::Valid() const {
++   // return col_idx_!=-1;
++    //todo:做个检查
++    return true;
++}
++
++std::string minidb::ColumnValueExpression::ToString() const {
++    return col_name_;
++}
++
++minidb::Value minidb::ColumnValueExpression::Evaluate(const Tuple *tuple, const Schema *schema) const {
++    const auto &columns=schema->GetColumns();
++    auto it=std::find_if(columns.begin(),columns.end(),
++    [this](const Column&c) {
++        return c.column_name_==col_name_;
++    }
++    );
++    uint32_t col_idx=-1;
++    if (it!=schema->GetColumns().end()) {
++        col_idx=std::distance(columns.begin(),it);
++    }
++    else throw std::logic_error(std::format("unknown column name {}",col_name_));
++    return tuple->GetValues()[col_idx];
++}
+diff --git a/expression.h b/expression.h
+new file mode 100644
+index 0000000..8010a3a
+--- /dev/null
++++ b/expression.h
+@@ -0,0 +1,58 @@
++//
++// Created by wjh on 2026/6/21.
++//
++
++#pragma  once
++#include"value.h"
++#include"tuple.h"
++#include"catalog.h"
++
++namespace minidb {
++    class AbstractExpression {
++    public:
++        virtual ~AbstractExpression() = default;
++        virtual bool Valid()const=0;
++        virtual std::string ToString()const =0;
++        virtual Value Evaluate(const Tuple *tuple, const Schema *schema) const =0;
++    };
++
++    class ConstantValueExpression : public AbstractExpression {
++    public:
++        ConstantValueExpression(Value val);
++        bool Valid()const;
++        std::string ToString()const;
++        virtual Value Evaluate(const Tuple *tuple, const Schema *schema) const;
++
++    private:
++        Value val_;
++    };
++
++    class ColumnValueExpression : public AbstractExpression {
++    public:
++        ColumnValueExpression( const std::string &col_name);
++        bool Valid()const;
++        std::string ToString()const;
++        virtual Value Evaluate(const Tuple *tuple, const Schema *schema) const;
++
++    private:
++        std::string col_name_;
++    };
++    enum class CompareOp {
++        Lt,
++        Le,
++        Gt,
++        Ge,
++        Ne,
++        Eq
++    };
++    class ComparisonExpression : public AbstractExpression {
++    public:
++        ComparisonExpression(AbstractExpression*left,AbstractExpression*right,CompareOp op);
++        virtual Value Evaluate(const Tuple *tuple, const Schema *schema) const;
++        bool Valid()const;
++        std::string ToString()const;
++    private:
++        AbstractExpression*left_,*right_;
++        CompareOp op_;
++    };
++}
+diff --git a/main.cpp b/main.cpp
+index 18fb702..ef6c7f3 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -3,11 +3,15 @@
+ using namespace minidb;
+ //create table user(name varchar,age int,sex bool );
+ //insert into user values('wjh',123,true);
++//insert into user values('cmq',456,false);
++//insert into user values('sunzi',789,false);
++//select*from user where name='sunzi';
++//select*from user where age >=456;
++//select*from user where age !=456;
+ //create table student(id int,score int,name varchar);
+ //insert into student values(0,100,'wzf');
+ int main() {
+-  Shell shell("test_catalog_serialize.db");
+-   shell.Run();
+-    printf("hello");
++    Shell shell("test_filter_plan.db");
++    shell.Run();
+     return 0;
+-}
+\ No newline at end of file
++}
+diff --git a/parser.cpp b/parser.cpp
+index e307f90..ff31706 100644
+--- a/parser.cpp
++++ b/parser.cpp
+@@ -12,8 +12,8 @@ minidb::StatementType minidb::SQLStatement::GetType() const {
+     return type_;
+ }
+ 
+-minidb::SelectStatement::SelectStatement(std::string table_name)
+-    :SQLStatement(StatementType::SELECT),table_name_(std::move(table_name))
++minidb::SelectStatement::SelectStatement(std::string table_name,std::unique_ptr<AbstractExpression>cond)
++    :SQLStatement(StatementType::SELECT),table_name_(std::move(table_name)),cond_(std::move(cond))
+ {
+ }
+ 
+@@ -36,7 +36,7 @@ minidb::CreateTableStatement::CreateTableStatement(std::string table_name, std::
+ 
+ }
+ 
+-std::unique_ptr<minidb::SQLStatement> minidb::Parser::Parse() {
++std::unique_ptr<minidb::SQLStatement> minidb::Parser::ParseStatement() {
+     TokenType first_type = Peek().type_;
+     std::unique_ptr<SQLStatement> ast = nullptr;
+ 
+@@ -56,10 +56,80 @@ std::unique_ptr<minidb::SQLStatement> minidb::Parser::Parse() {
+     if (!IsAtEnd()) {
+         throw std::runtime_error("Syntax Error: Unexpected tokens at the end of the statement.");
+     }
+-
++    PrintAST(ast.get());
+     return ast;
+ }
+ 
++std::unique_ptr<minidb::AbstractExpression> minidb::Parser::ParseExpression() {
++    auto left=ParsePrimary();
++    while (IsCompareOp(Peek().type_)) {
++        auto compare_op=ToCompareOp(Advance().type_);
++        auto right=ParsePrimary();
++        left=std::make_unique<ComparisonExpression>(left.release(),right.release(),compare_op);
++    }
++    return left;
++}
++
++std::unique_ptr<minidb::AbstractExpression> minidb::Parser::ParsePrimary() {
++    if (Match(TokenType::IDENTIFIER)) {
++        std::string id=Last().text_;
++        return std::make_unique<ColumnValueExpression>(id);
++    }
++    else if (Match(TokenType::STRING)) {
++        return std::make_unique<ConstantValueExpression>(Value(Last().text_));
++    }
++    else if (Match(TokenType::NUMBER)) {
++        return std::make_unique<ConstantValueExpression>(Value(std::stoi(Last().text_)));
++    }
++    else if (Match(TokenType::KW_TRUE)) {
++        return std::make_unique<ConstantValueExpression>(Value(true));
++
++    }
++    else if (Match(TokenType::KW_FALSE)) {
++        return std::make_unique<ConstantValueExpression>(Value(false));
++    }
++    throw std::logic_error("unknown expression");
++}
++
++minidb::CompareOp minidb::Parser::ToCompareOp(TokenType tok_ty) {
++    switch (tok_ty) {
++        case TokenType::TK_LT:
++            return CompareOp::Lt;
++        case TokenType::TK_LE:
++            return CompareOp::Le;
++        case TokenType::TK_GT:
++            return CompareOp::Gt;
++        case TokenType::TK_GE:
++            return CompareOp::Ge;
++        case TokenType::TK_EQ:
++            return CompareOp::Eq;
++        case TokenType::TK_NEQ:
++            return CompareOp::Ne;
++        default:
++            throw std::runtime_error(" token is not compare op");
++    }
++
++}
++
++bool minidb::Parser::IsCompareOp(TokenType tok_ty) {
++    switch (tok_ty) {
++        case TokenType::TK_LT:
++        case TokenType::TK_LE:
++        case TokenType::TK_GT:
++        case TokenType::TK_GE:
++        case TokenType::TK_EQ:
++        case TokenType::TK_NEQ:
++            return true;
++        default:
++            return false;
++    }
++
++}
++
++minidb::Token minidb::Parser::Last() const {
++    return tokens_[cursor_-1];
++}
++
+ minidb::Token minidb::Parser::Peek() const {
+     if (IsAtEnd()) return tokens_.back(); // 返回最后的 EOF
+     return tokens_[cursor_];
+@@ -81,12 +151,22 @@ minidb::Token minidb::Parser::Consume(TokenType expected_type, const std::string
+     throw std::runtime_error("Syntax Error: " + error_message + " (Got: '" + Peek().text_ + "')");
+ }
+ 
++bool minidb::Parser::Match(TokenType expected_type) {
++    if (Peek().type_ == expected_type) {
++        Advance();
++        return true;
++    }
++    return false;
++}
++
+ std::unique_ptr<minidb::SelectStatement> minidb::Parser::ParseSelect() {
+     Consume(TokenType::KW_SELECT, "Expected 'SELECT'");
+     Consume(TokenType::TK_STAR, "Currently only 'SELECT *' is supported");
+     Consume(TokenType::KW_FROM, "Expected 'FROM' after '*'");
+     Token table_name_token = Consume(TokenType::IDENTIFIER, "Expected table name after 'FROM'");
+-
++    if (Match(TokenType::KW_WHERE)) {
++        return std::make_unique<SelectStatement>(table_name_token.text_,ParseExpression());
++    }
+     return std::make_unique<SelectStatement>(table_name_token.text_);
+ }
+ 
+@@ -174,18 +254,39 @@ std::unique_ptr<minidb::CreateTableStatement> minidb::Parser::ParseCreateTable()
+     Consume(TokenType::TK_RPAREN, "Expected ')' at the end of column definition");
+     return std::make_unique<CreateTableStatement>(table_name,columns);
+ }
+-
++#include<format>
+ void minidb::PrintAST(SQLStatement *ast, int indent)
+ {
++    printf("======语法树节点======\n");
+     std::string prefix(indent, ' ');
+     if (ast->GetType() == StatementType::SELECT) {
+         auto sel = static_cast<SelectStatement*>(ast);
+-        std::cout << prefix << "[SelectStatement] 扫描表: " << sel->table_name_ << "\n";
++        if (sel->cond_) {
++            std::cout<<std::format("{}[SelectStatement] 扫描表: {}\n",prefix,sel->table_name_);
++            std::cout<<std::format("{}  └── 筛选条件节点:{}\n",prefix,sel->cond_->ToString());
++        }
++        else
++        std::cout<<std::format("{}[SelectStatement] 扫描表: {}\n",prefix,sel->table_name_);
++
+     } else if (ast->GetType() == StatementType::INSERT) {
+         auto ins = static_cast<InsertStatement*>(ast);
+-        std::cout << prefix << "[InsertStatement] 写入目标表: " << ins->table_name_ << "\n";
+-        std::cout << prefix << "  └── 数据来源子节点:\n";
+-        PrintAST(ins->select_query_.get(), indent + 6);
++        std::cout<<std::format("{}[InsertStatement] 写入目标表: {}\n",prefix,ins->table_name_);
++
++
++        if (ins->has_values_) {
++            std::string data_str="VALUES(";
++            for (auto  &value:ins->raw_values_) {
++                data_str+=value.ToString();
++                data_str+=",";
++            }
++            data_str+=")";
++            std::cout<<std::format("{}  └── 数据来源子节点:{}\n",prefix,data_str);
++        }
++        else {
++            std::cout<<std::format("{}  └── 数据来源子节点:\n",prefix);
++            PrintAST(ins->select_query_.get(), indent + 6);
++        }
++
+     }
+     else if (ast->GetType()==StatementType::CREATE_TABLE) {
+         static std::map<TypeId,std::string>type_strs={
+diff --git a/parser.h b/parser.h
+index ccdfd22..990be7d 100644
+--- a/parser.h
++++ b/parser.h
+@@ -4,6 +4,7 @@
+ #include"catalog.h"
+ #include<memory>
+ #include<iostream>
++#include"expression.h"
+ namespace minidb {
+     enum class StatementType {
+         SELECT,
+@@ -19,7 +20,8 @@ namespace minidb {
+         StatementType type_;
+     };
+     struct SelectStatement:public SQLStatement {
+-        SelectStatement(std::string table_name);
++        SelectStatement(std::string table_name,std::unique_ptr<AbstractExpression>cond=nullptr);
++        std::unique_ptr<AbstractExpression>cond_;
+         std::string table_name_;
+     };
+     struct InsertStatement:public SQLStatement {
+@@ -41,21 +43,26 @@ namespace minidb {
+     class Parser {
+     public:
+         explicit Parser(const std::vector<Token>& tokens) : tokens_(tokens), cursor_(0) {}
+-        std::unique_ptr<SQLStatement> Parse();
++        std::unique_ptr<SQLStatement> ParseStatement();
+ 
+     private:
+         std::vector<Token> tokens_;
+         size_t cursor_;
+ 
+-
++        Token Last()const;
+         Token Peek() const;
+         Token Advance();
+         bool IsAtEnd() const;
+         Token Consume(TokenType expected_type, const std::string& error_message);
+-
++        bool Match(TokenType expected_type);
+         // --- 具体语句的推导逻辑 (递归下降逻辑) ---
+         std::unique_ptr<SelectStatement> ParseSelect();
+         std::unique_ptr<InsertStatement> ParseInsert();
+         std::unique_ptr<CreateTableStatement>ParseCreateTable();
++        // --- 解析表达式
++        std::unique_ptr<AbstractExpression>ParseExpression();
++        std::unique_ptr<AbstractExpression>ParsePrimary();
++        CompareOp ToCompareOp(TokenType tok_ty);
++        bool IsCompareOp(TokenType tok_ty);
+     };
+ }
+\ No newline at end of file
+diff --git a/planner.cpp b/planner.cpp
+index e69493b..d37d525 100644
+--- a/planner.cpp
++++ b/planner.cpp
+@@ -15,7 +15,11 @@ std::unique_ptr<minidb::AbstractExecutor> minidb::Planner::Plan(SQLStatement *as
+ std::unique_ptr<minidb::AbstractExecutor> minidb::Planner::PlanSelect(SelectStatement *stmt) {
+     TableHeap *table = catalog_->GetTableHeap(stmt->table_name_);
+     const std::vector<TypeId>&type_ids=catalog_->GetSchema(stmt->table_name_).GetSchemaType();
+-    return std::make_unique<SeqScanExecutor>(table, type_ids);
++    std::unique_ptr<AbstractExecutor> child=std::make_unique<SeqScanExecutor>(table, type_ids);
++    if (stmt->cond_) {
++        return std::make_unique<FilterExecutor>(child.release(),stmt->cond_.get(),&catalog_->GetSchema(stmt->table_name_));
++    }
++    return child;
+ }
+ 
+ std::unique_ptr<minidb::AbstractExecutor> minidb::Planner::PlanInsert(InsertStatement *stmt) {
+diff --git a/shell.cpp b/shell.cpp
+index fafcde4..3b2a56c 100644
+--- a/shell.cpp
++++ b/shell.cpp
+@@ -30,7 +30,7 @@ void minidb::Shell::Run() {
+         ExecuteSQL(sql);
+ 
+     }
+-    catalog_.save();
++
+ 
+ }
+ 
+@@ -38,12 +38,13 @@ void minidb::Shell::ExecuteSQL(const std::string &sql) {
+     try {
+         Tokenizer tokenizer(sql);
+         Parser parser(tokenizer.Tokenize());
+-        auto ast=parser.Parse();
++        auto ast=parser.ParseStatement();
+         if (ast->GetType() == StatementType::CREATE_TABLE) {
+             // 执行 DDL: 建表
+             auto create_stmt = static_cast<CreateTableStatement*>(ast.get());
+             Schema new_schema(create_stmt->columns_);
+             catalog_.CreateTable(create_stmt->table_name_, new_schema);
++            catalog_.save();
+             std::cout << "Query OK, 0 rows affected.\n";
+ 
+         } else {
+diff --git a/token.cpp b/token.cpp
+index 679d369..2103784 100644
+--- a/token.cpp
++++ b/token.cpp
+@@ -77,6 +77,7 @@ minidb::Token minidb::Tokenizer::ConsumeKeywordOrIdentifier() {
+     if (upper_text=="TRUE")return {TokenType::KW_TRUE,upper_text};
+     if (upper_text=="FALSE")return {TokenType::KW_FALSE,upper_text};
+     if (upper_text=="VALUES")return {TokenType::KW_VALUES,upper_text};
++    if (upper_text=="WHERE")return {TokenType::KW_WHERE,upper_text};
+     return {TokenType::IDENTIFIER, text};
+ }
+ 
+@@ -88,6 +89,31 @@ minidb::Token minidb::Tokenizer::ConsumeSymbol() {
+         case '(':return {TokenType::TK_LPAREN,"("};
+         case ')':return {TokenType::TK_RPAREN,")"};
+         case ',':return {TokenType::TK_COMMA,","};
++        case '<': {
++            if (Peek()=='=') {
++                Advance();
++                return {TokenType::TK_LE, "<="};
++            }
++            return {TokenType::TK_LT, "<"};
++
++        }
++        case '>': {
++            if (Peek()=='=') {
++                Advance();
++                return {TokenType::TK_GE, ">="};
++            }
++            return {TokenType::TK_GT, ">"};
++        }
++
++        case '!': {
++            if (Advance()=='=')
++            return {TokenType::TK_NEQ, "!="};
++            break;
++        }
++        case '=': {
++            return {TokenType::TK_EQ,"="};
++            break;
++        }
+     }
+     throw std::runtime_error(std::string("Lexer error: Unexpected character '") + c + "'");
+ }
+diff --git a/token.h b/token.h
+index 8695281..64041b8 100644
+--- a/token.h
++++ b/token.h
+@@ -10,6 +10,7 @@ namespace minidb {
+         KW_INTO,
+         KW_CREATE,
+         KW_TABLE,
++        KW_WHERE,
+         KW_INT,
+         KW_VARCHAR,
+         KW_BOOL,
+@@ -21,6 +22,12 @@ namespace minidb {
+         TK_COMMA,
+         TK_STAR,    // *
+         TK_SEMI,    // ;
++        TK_LT,      // <
++        TK_LE,      // <=
++        TK_GT,      // >
++        TK_GE,      // >=
++        TK_EQ,      // ==
++        TK_NEQ,     // !=
+         IDENTIFIER,     // 表名或列名，比如 users
+         NUMBER,
+         STRING,
+diff --git a/value.cpp b/value.cpp
+index 6c542ab..2d48816 100644
+--- a/value.cpp
++++ b/value.cpp
+@@ -1,6 +1,7 @@
+ #include "value.h"
+ #include<cassert>
+ #include<string.h>
++#include<format>
+ minidb::Value::Value()
+     : value_(std::monostate{}) {
+     type_id_ = TypeId::INVALID;
+@@ -22,6 +23,44 @@ minidb::Value::Value(const char *value): value_(std::string(value))
+ {
+     type_id_ = TypeId::VARCHAR;
+ }
++
++bool minidb::Value::CompareEQ(const Value &other) const {
++    CheckCompareValid(other);
++    return value_==other.value_;
++}
++
++bool minidb::Value::CompareNEQ(const Value &other) const {
++    CheckCompareValid(other);
++    return value_!=other.value_;
++}
++
++bool minidb::Value::CompareGT(const Value &other) const {
++    CheckCompareValid(other);
++    return value_>other.value_;
++}
++
++bool minidb::Value::CompareGE(const Value &other) const {
++    CheckCompareValid(other);
++    return value_>=other.value_;
++}
++
++bool minidb::Value::CompareLT(const Value &other) const {
++    CheckCompareValid(other);
++    return value_<other.value_;
++}
++
++bool minidb::Value::CompareLE(const Value &other) const {
++    return value_<=other.value_;
++}
++
++bool minidb::Value::CheckCompareValid(const Value &other) const {
++    if (GetTypeId()!=other.GetTypeId()) {
++        throw std::logic_error("Type mismatch in comparison");
++        return false;
++    }
++    return true;
++}
++
+ minidb::TypeId minidb::Value::GetTypeId() const {
+     return type_id_;
+ }
+@@ -60,7 +99,7 @@ std::string minidb::Value::ToString() const {
+         } else if constexpr (std::is_same_v<T, int32_t>) {
+             return std::to_string(arg);
+         } else if constexpr (std::is_same_v<T, std::string>) {
+-            return arg;
++            return std::format("'{}'",arg);
+         }else {
+             static_assert(sizeof(T)==0,"unknown type");
+         }
+diff --git a/value.h b/value.h
+index 4be7655..3d93d10 100644
+--- a/value.h
++++ b/value.h
+@@ -21,7 +21,13 @@ namespace minidb {
+         // 构造一个字符串值
+         explicit Value(std::string value);
+         explicit Value(const char* value);
+-
++        bool CompareEQ(const Value&other)const;
++        bool CompareNEQ(const Value&other)const;
++        bool CompareGT(const Value&other)const;
++        bool CompareGE(const Value&other)const;
++        bool CompareLT(const Value&other)const;
++        bool CompareLE(const Value&other)const;
++        bool CheckCompareValid(const Value&other)const;
+         TypeId GetTypeId() const;
+         bool IsNull() const;
+         bool GetAsBool() const;

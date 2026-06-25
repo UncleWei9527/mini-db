@@ -36,15 +36,22 @@ minidb::CreateTableStatement::CreateTableStatement(std::string table_name, std::
 
 }
 
+minidb::DeleteStatement::DeleteStatement(std::string table_name, std::unique_ptr<AbstractExpression> cond)
+    :SQLStatement(StatementType::DELETE),table_name_(std::move(table_name)),cond_(std::move(cond))
+{
+}
+
 std::unique_ptr<minidb::SQLStatement> minidb::Parser::ParseStatement() {
-    TokenType first_type = Peek().type_;
     std::unique_ptr<SQLStatement> ast = nullptr;
 
-    if (first_type == TokenType::KW_SELECT) {
+    if (Match( TokenType::KW_SELECT)) {
         ast = ParseSelect();
-    } else if (first_type == TokenType::KW_INSERT) {
+    } else if (Match(TokenType::KW_INSERT)) {
         ast = ParseInsert();
-    }else if (first_type==TokenType::KW_CREATE) {
+    }else if (Match(TokenType::KW_DELETE)) {
+        ast=ParseDelete();
+    }
+    else if (Match(TokenType::KW_CREATE)) {
         ast=ParseCreateTable();
     }
     else {
@@ -65,7 +72,7 @@ std::unique_ptr<minidb::AbstractExpression> minidb::Parser::ParseExpression() {
     while (IsCompareOp(Peek().type_)) {
         auto compare_op=ToCompareOp(Advance().type_);
         auto right=ParsePrimary();
-        left=std::make_unique<ComparisonExpression>(left.release(),right.release(),compare_op);
+        left.reset(new ComparisonExpression(std::move(left),std::move(right),compare_op));
     }
     return left;
 }
@@ -160,7 +167,6 @@ bool minidb::Parser::Match(TokenType expected_type) {
 }
 
 std::unique_ptr<minidb::SelectStatement> minidb::Parser::ParseSelect() {
-    Consume(TokenType::KW_SELECT, "Expected 'SELECT'");
     Consume(TokenType::TK_STAR, "Currently only 'SELECT *' is supported");
     Consume(TokenType::KW_FROM, "Expected 'FROM' after '*'");
     Token table_name_token = Consume(TokenType::IDENTIFIER, "Expected table name after 'FROM'");
@@ -171,8 +177,6 @@ std::unique_ptr<minidb::SelectStatement> minidb::Parser::ParseSelect() {
 }
 
 std::unique_ptr<minidb::InsertStatement> minidb::Parser::ParseInsert() {
-    TokenType first_type = Peek().type_;
-    Consume(TokenType::KW_INSERT, "Expected 'INSERT'");
     Consume(TokenType::KW_INTO, "Expected 'INTO' after 'INSERT'");
     std::string  table_name =
         Consume(TokenType::IDENTIFIER, "Expected target table name after 'INTO'").text_;
@@ -215,8 +219,16 @@ std::unique_ptr<minidb::InsertStatement> minidb::Parser::ParseInsert() {
     throw std::runtime_error("Syntax Error: INSERT expects SELECT or VALUES");
 }
 
+std::unique_ptr<minidb::DeleteStatement> minidb::Parser::ParseDelete() {
+    Consume(TokenType::KW_FROM, "Expected 'FROM' after 'DELETE'");
+    std::string  table_name =
+       Consume(TokenType::IDENTIFIER, "Expected target table name after 'DELETE FROM'").text_;
+    Consume(TokenType::KW_WHERE,"Expected 'WHERE' after table name");
+    return std::make_unique<DeleteStatement>(table_name,ParseExpression());
+
+}
+
 std::unique_ptr<minidb::CreateTableStatement> minidb::Parser::ParseCreateTable() {
-    Consume(TokenType::KW_CREATE, "Expected 'CREATE'");
     Consume(TokenType::KW_TABLE, "Expected 'TABLE' after 'CREATE'");
     std::string table_name=Consume(TokenType::IDENTIFIER, "Expected table name").text_;
     Consume(TokenType::TK_LPAREN, "Expected '(' after table name");
@@ -287,6 +299,11 @@ void minidb::PrintAST(SQLStatement *ast, int indent)
             PrintAST(ins->select_query_.get(), indent + 6);
         }
 
+    }
+    else if (ast->GetType()==StatementType::DELETE) {
+        auto del = static_cast<DeleteStatement*>(ast);
+        std::cout<<std::format("{}[DeleteStatement] 删除目标行: {}\n",prefix,del->table_name_);
+        std::cout<<std::format("{}  └── 筛选条件节点:{}\n",prefix,del->cond_->ToString());
     }
     else if (ast->GetType()==StatementType::CREATE_TABLE) {
         static std::map<TypeId,std::string>type_strs={

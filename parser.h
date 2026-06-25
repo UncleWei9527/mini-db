@@ -9,6 +9,7 @@ namespace minidb {
     enum class StatementType {
         SELECT,
         INSERT,
+        DELETE,
         CREATE_TABLE,
 
     };
@@ -39,6 +40,12 @@ namespace minidb {
         std::string table_name_;
         std::vector<Column>columns_;
     };
+    struct DeleteStatement:public SQLStatement {
+        DeleteStatement(std::string table_name,std::unique_ptr<AbstractExpression>cond);
+        std::string table_name_;
+        std::unique_ptr<AbstractExpression>cond_;
+    };
+
     void PrintAST(SQLStatement* ast, int indent = 0) ;
     class Parser {
     public:
@@ -58,10 +65,13 @@ namespace minidb {
         // --- 具体语句的推导逻辑 (递归下降逻辑) ---
         std::unique_ptr<SelectStatement> ParseSelect();
         std::unique_ptr<InsertStatement> ParseInsert();
+        std::unique_ptr<DeleteStatement>ParseDelete();
         std::unique_ptr<CreateTableStatement>ParseCreateTable();
+
         // --- 解析表达式
         std::unique_ptr<AbstractExpression>ParseExpression();
         std::unique_ptr<AbstractExpression>ParsePrimary();
+
         CompareOp ToCompareOp(TokenType tok_ty);
         bool IsCompareOp(TokenType tok_ty);
     };

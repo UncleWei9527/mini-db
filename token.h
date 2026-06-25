@@ -11,6 +11,7 @@ namespace minidb {
         KW_CREATE,
         KW_TABLE,
         KW_WHERE,
+        KW_DELETE,
         KW_INT,
         KW_VARCHAR,
         KW_BOOL,

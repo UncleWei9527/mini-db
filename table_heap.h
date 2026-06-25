@@ -15,6 +15,7 @@ namespace minidb {
         std::optional<Tuple> GetTuple(const RID &rid, const std::vector<TypeId> &schema);
         page_id_t GetFirstPageId() const { return first_page_id_; }
         page_id_t GetLastPageId()const{return last_page_id_;}
+        bool MarkDelete(const RID&rid);
         TableIterator Begin(const std::vector<TypeId> &schema);
         TableIterator End();
     private:

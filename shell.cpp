@@ -58,7 +58,10 @@ void minidb::Shell::ExecuteSQL(const std::string &sql) {
                     std::cout << tuple.ToString() << "\n";
                 }
                 std::cout<<std::format("{} rows in set.\n", result_set.size() );
+            }else if (ast->GetType()==StatementType::DELETE) {
+                std::cout<<std::format("Query OK, {} rows deleted.\n",result_set[0].GetValues()[0].GetAsInt());
             }
+
         }
     }catch (const std::exception& e) {
         std::cout<<std::format("ERROR: {}\n",e.what());

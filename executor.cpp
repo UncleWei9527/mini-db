@@ -95,3 +95,23 @@ std::optional<minidb::Tuple> minidb::FilterExecutor::Next() {
     }
 }
 
+minidb::DeleteExecutor::DeleteExecutor(AbstractExecutor *child, TableHeap*target_table)
+:child_(child),target_table_(target_table)
+{
+}
+
+void minidb::DeleteExecutor::Init() {
+    has_report_=false;
+    child_->Init();
+}
+
+std::optional<minidb::Tuple> minidb::DeleteExecutor::Next() {
+    if (has_report_)return std::nullopt;
+    has_report_=true;
+    int delete_count=0;
+    while (auto tuple = child_->Next()) {
+        target_table_->MarkDelete(tuple->GetRid());
+        delete_count++;
+    }
+    return minidb::Tuple(std::vector<Value> (1,Value(delete_count)));
+}

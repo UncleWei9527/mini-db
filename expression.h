@@ -36,6 +36,7 @@ namespace minidb {
 
     private:
         std::string col_name_;
+        mutable uint32_t cached_col_idx=-1;
     };
     enum class CompareOp {
         Lt,
@@ -47,12 +48,13 @@ namespace minidb {
     };
     class ComparisonExpression : public AbstractExpression {
     public:
-        ComparisonExpression(AbstractExpression*left,AbstractExpression*right,CompareOp op);
+        ComparisonExpression(std::unique_ptr<AbstractExpression>left,std::unique_ptr<AbstractExpression>right,CompareOp op);
         virtual Value Evaluate(const Tuple *tuple, const Schema *schema) const;
         bool Valid()const;
         std::string ToString()const;
     private:
-        AbstractExpression*left_,*right_;
+        //AbstractExpression*left_,*right_;
+        std::unique_ptr<AbstractExpression>left_,right_;
         CompareOp op_;
     };
 }

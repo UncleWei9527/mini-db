@@ -8,6 +8,8 @@ using namespace minidb;
 //select*from user where name='sunzi';
 //select*from user where age >=456;
 //select*from user where age !=456;
+//delete from user where name='noexit_name';
+//delete from user where age = 456;
 //create table student(id int,score int,name varchar);
 //insert into student values(0,100,'wzf');
 int main() {

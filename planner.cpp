@@ -8,6 +8,8 @@ std::unique_ptr<minidb::AbstractExecutor> minidb::Planner::Plan(SQLStatement *as
         return PlanSelect(static_cast<SelectStatement*>(ast));
     } else if (ast->GetType() == StatementType::INSERT) {
         return PlanInsert(static_cast<InsertStatement*>(ast));
+    }else if (ast->GetType()==StatementType::DELETE) {
+        return PlanDelete(static_cast<DeleteStatement *>(ast));
     }
     throw std::runtime_error("Planner Error: Unsupported AST node.");
 }
@@ -31,4 +33,14 @@ std::unique_ptr<minidb::AbstractExecutor> minidb::Planner::PlanInsert(InsertStat
     else
      child = Plan(stmt->select_query_.get());
     return std::make_unique<InsertExecutor>(child.release(), target_table);
+}
+
+std::unique_ptr<minidb::AbstractExecutor> minidb::Planner::PlanDelete(DeleteStatement *stmt) {
+    TableHeap *tb_hp = catalog_->GetTableHeap(stmt->table_name_);
+    const std::vector<TypeId>& type_ids = catalog_->GetSchema(stmt->table_name_).GetSchemaType();
+    std::unique_ptr<AbstractExecutor> child = std::make_unique<SeqScanExecutor>(tb_hp, type_ids);
+    if (stmt->cond_) {
+        child = std::make_unique<FilterExecutor>(child.release(), stmt->cond_.get(), &catalog_->GetSchema(stmt->table_name_));
+    }
+    return std::make_unique<DeleteExecutor>(child.release(), tb_hp);
 }

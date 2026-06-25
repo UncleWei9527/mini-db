@@ -36,6 +36,15 @@ namespace minidb {
         return TableIterator(this, RID(INVALID_PAGE_ID, 0),{});
     }
 
+    bool TableHeap::MarkDelete(const RID &rid) {
+        Page*page=bpm_->FetchPage(rid.GetPageId());
+        if (page==nullptr)return false;
+        TablePage tb_page(page);
+        bool res=tb_page.MarkDelete(rid);
+        bpm_->UnpinPage(page->GetPageId(), true);
+        return res;
+    }
+
     TableIterator TableHeap::Begin(const std::vector<TypeId> &schema) {
         page_id_t curr_page_id = first_page_id_;
         if (curr_page_id == INVALID_PAGE_ID) {

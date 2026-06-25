@@ -56,6 +56,18 @@ namespace minidb {
         const Schema*schema_;
 
     };
+    class DeleteExecutor:public AbstractExecutor {
+    public:
+        explicit DeleteExecutor(AbstractExecutor*child,TableHeap*target_table);
+        void Init() override;
+        std::optional<Tuple> Next() override ;
+    private:
+        AbstractExecutor*child_;
+        AbstractExpression*predicate_;
+        const Schema*schema_;
+        TableHeap*target_table_;
+        bool has_report_=false;
+    };
 
 
 

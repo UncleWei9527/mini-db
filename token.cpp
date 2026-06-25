@@ -77,6 +77,7 @@ minidb::Token minidb::Tokenizer::ConsumeKeywordOrIdentifier() {
     if (upper_text=="TRUE")return {TokenType::KW_TRUE,upper_text};
     if (upper_text=="FALSE")return {TokenType::KW_FALSE,upper_text};
     if (upper_text=="VALUES")return {TokenType::KW_VALUES,upper_text};
+    if (upper_text=="WHERE")return {TokenType::KW_WHERE,upper_text};
     return {TokenType::IDENTIFIER, text};
 }
 
@@ -88,6 +89,31 @@ minidb::Token minidb::Tokenizer::ConsumeSymbol() {
         case '(':return {TokenType::TK_LPAREN,"("};
         case ')':return {TokenType::TK_RPAREN,")"};
         case ',':return {TokenType::TK_COMMA,","};
+        case '<': {
+            if (Peek()=='=') {
+                Advance();
+                return {TokenType::TK_LE, "<="};
+            }
+            return {TokenType::TK_LT, "<"};
+
+        }
+        case '>': {
+            if (Peek()=='=') {
+                Advance();
+                return {TokenType::TK_GE, ">="};
+            }
+            return {TokenType::TK_GT, ">"};
+        }
+
+        case '!': {
+            if (Advance()=='=')
+            return {TokenType::TK_NEQ, "!="};
+            break;
+        }
+        case '=': {
+            return {TokenType::TK_EQ,"="};
+            break;
+        }
     }
     throw std::runtime_error(std::string("Lexer error: Unexpected character '") + c + "'");
 }

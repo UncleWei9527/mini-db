@@ -1,6 +1,7 @@
 #include "value.h"
 #include<cassert>
 #include<string.h>
+#include<format>
 minidb::Value::Value()
     : value_(std::monostate{}) {
     type_id_ = TypeId::INVALID;
@@ -22,6 +23,44 @@ minidb::Value::Value(const char *value): value_(std::string(value))
 {
     type_id_ = TypeId::VARCHAR;
 }
+
+bool minidb::Value::CompareEQ(const Value &other) const {
+    CheckCompareValid(other);
+    return value_==other.value_;
+}
+
+bool minidb::Value::CompareNEQ(const Value &other) const {
+    CheckCompareValid(other);
+    return value_!=other.value_;
+}
+
+bool minidb::Value::CompareGT(const Value &other) const {
+    CheckCompareValid(other);
+    return value_>other.value_;
+}
+
+bool minidb::Value::CompareGE(const Value &other) const {
+    CheckCompareValid(other);
+    return value_>=other.value_;
+}
+
+bool minidb::Value::CompareLT(const Value &other) const {
+    CheckCompareValid(other);
+    return value_<other.value_;
+}
+
+bool minidb::Value::CompareLE(const Value &other) const {
+    return value_<=other.value_;
+}
+
+bool minidb::Value::CheckCompareValid(const Value &other) const {
+    if (GetTypeId()!=other.GetTypeId()) {
+        throw std::logic_error("Type mismatch in comparison");
+        return false;
+    }
+    return true;
+}
+
 minidb::TypeId minidb::Value::GetTypeId() const {
     return type_id_;
 }
@@ -60,7 +99,7 @@ std::string minidb::Value::ToString() const {
         } else if constexpr (std::is_same_v<T, int32_t>) {
             return std::to_string(arg);
         } else if constexpr (std::is_same_v<T, std::string>) {
-            return arg;
+            return std::format("'{}'",arg);
         }else {
             static_assert(sizeof(T)==0,"unknown type");
         }

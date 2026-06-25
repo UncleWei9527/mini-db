@@ -4,6 +4,7 @@
 #include"catalog.h"
 #include<memory>
 #include<iostream>
+#include"expression.h"
 namespace minidb {
     enum class StatementType {
         SELECT,
@@ -19,7 +20,8 @@ namespace minidb {
         StatementType type_;
     };
     struct SelectStatement:public SQLStatement {
-        SelectStatement(std::string table_name);
+        SelectStatement(std::string table_name,std::unique_ptr<AbstractExpression>cond=nullptr);
+        std::unique_ptr<AbstractExpression>cond_;
         std::string table_name_;
     };
     struct InsertStatement:public SQLStatement {
@@ -41,21 +43,26 @@ namespace minidb {
     class Parser {
     public:
         explicit Parser(const std::vector<Token>& tokens) : tokens_(tokens), cursor_(0) {}
-        std::unique_ptr<SQLStatement> Parse();
+        std::unique_ptr<SQLStatement> ParseStatement();
 
     private:
         std::vector<Token> tokens_;
         size_t cursor_;
 
-
+        Token Last()const;
         Token Peek() const;
         Token Advance();
         bool IsAtEnd() const;
         Token Consume(TokenType expected_type, const std::string& error_message);
-
+        bool Match(TokenType expected_type);
         // --- 具体语句的推导逻辑 (递归下降逻辑) ---
         std::unique_ptr<SelectStatement> ParseSelect();
         std::unique_ptr<InsertStatement> ParseInsert();
         std::unique_ptr<CreateTableStatement>ParseCreateTable();
+        // --- 解析表达式
+        std::unique_ptr<AbstractExpression>ParseExpression();
+        std::unique_ptr<AbstractExpression>ParsePrimary();
+        CompareOp ToCompareOp(TokenType tok_ty);
+        bool IsCompareOp(TokenType tok_ty);
     };
 }

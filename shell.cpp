@@ -30,7 +30,7 @@ void minidb::Shell::Run() {
         ExecuteSQL(sql);
 
     }
-    catalog_.save();
+
 
 }
 
@@ -38,12 +38,13 @@ void minidb::Shell::ExecuteSQL(const std::string &sql) {
     try {
         Tokenizer tokenizer(sql);
         Parser parser(tokenizer.Tokenize());
-        auto ast=parser.Parse();
+        auto ast=parser.ParseStatement();
         if (ast->GetType() == StatementType::CREATE_TABLE) {
             // 执行 DDL: 建表
             auto create_stmt = static_cast<CreateTableStatement*>(ast.get());
             Schema new_schema(create_stmt->columns_);
             catalog_.CreateTable(create_stmt->table_name_, new_schema);
+            catalog_.save();
             std::cout << "Query OK, 0 rows affected.\n";
 
         } else {

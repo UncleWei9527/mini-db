@@ -83,6 +83,7 @@ void minidb::Catalog::SerializeTo(char *dst) const {
     //遍历表的名
     uint32_t offset=OFFSET_TABLE_INFO;
     for (const auto&[tb_name,tb_meta_data]:tables_ ) {
+        assert(offset < PAGE_SIZE && "Catalog metadata exceeded page size!");
         //写入表名
         uint32_t name_len=tb_name.size();
         std::memcpy(dst+offset,&name_len,sizeof(name_len));
@@ -104,7 +105,7 @@ void minidb::Catalog::SerializeTo(char *dst) const {
         offset+=sizeof(column_count);
         for (const auto&column: schema.GetColumns()) {
             //写入列的名字
-            size_t name_len=column.column_name_.size();
+            uint32_t name_len=column.column_name_.size();
             std::memcpy(dst+offset,&name_len,sizeof(name_len));
             offset+=sizeof(name_len);
             std::memcpy(dst+offset,column.column_name_.c_str(),name_len);
@@ -154,11 +155,11 @@ void minidb::Catalog::DeserializeFrom(const char *src)  {
         offset+=sizeof(column_count);
         for (size_t i=0;i<column_count;i++) {
             //读取列的名字
-            size_t name_len;
+            uint32_t name_len;
             std::memcpy(&name_len,src+offset,sizeof(name_len));
             offset+=sizeof(name_len);
             std::string column_name;column_name.resize(name_len);
-            std::memcpy((char*)column_name.c_str(),src+offset,name_len);
+            std::memcpy(column_name.data(),src+offset,name_len);
             offset+=name_len;
             //读取列的类型
             TypeId type_id;

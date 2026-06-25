@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 4.1)
 project(db)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -37,4 +37,6 @@ add_executable(db main.cpp
         execution_engine.cpp
         execution_engine.h
         shell.h
-        shell.cpp)
+        shell.cpp
+        expression.cpp
+        expression.h)

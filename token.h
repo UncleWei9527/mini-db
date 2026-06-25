@@ -10,6 +10,7 @@ namespace minidb {
         KW_INTO,
         KW_CREATE,
         KW_TABLE,
+        KW_WHERE,
         KW_INT,
         KW_VARCHAR,
         KW_BOOL,
@@ -21,6 +22,12 @@ namespace minidb {
         TK_COMMA,
         TK_STAR,    // *
         TK_SEMI,    // ;
+        TK_LT,      // <
+        TK_LE,      // <=
+        TK_GT,      // >
+        TK_GE,      // >=
+        TK_EQ,      // ==
+        TK_NEQ,     // !=
         IDENTIFIER,     // 表名或列名，比如 users
         NUMBER,
         STRING,

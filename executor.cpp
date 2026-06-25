@@ -75,3 +75,23 @@ std::optional<minidb::Tuple> minidb::ValuesExecutor::Next() {
     return Tuple(values_);
 }
 
+minidb::FilterExecutor::FilterExecutor(AbstractExecutor *child, AbstractExpression *predicate, const Schema *schema)
+    :child_(child),predicate_(predicate),schema_(schema)
+{
+}
+
+void minidb::FilterExecutor::Init() {
+    child_->Init();
+}
+
+std::optional<minidb::Tuple> minidb::FilterExecutor::Next() {
+    while (true) {
+        auto tuple=child_->Next();
+        if (!tuple.has_value())return std::nullopt;
+        Value result=predicate_->Evaluate(&tuple.value(),schema_);
+        if (result.GetAsBool()) {
+            return tuple;
+        }
+    }
+}
+

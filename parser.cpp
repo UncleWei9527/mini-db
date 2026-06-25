@@ -12,8 +12,8 @@ minidb::StatementType minidb::SQLStatement::GetType() const {
     return type_;
 }
 
-minidb::SelectStatement::SelectStatement(std::string table_name)
-    :SQLStatement(StatementType::SELECT),table_name_(std::move(table_name))
+minidb::SelectStatement::SelectStatement(std::string table_name,std::unique_ptr<AbstractExpression>cond)
+    :SQLStatement(StatementType::SELECT),table_name_(std::move(table_name)),cond_(std::move(cond))
 {
 }
 
@@ -36,7 +36,7 @@ minidb::CreateTableStatement::CreateTableStatement(std::string table_name, std::
 
 }
 
-std::unique_ptr<minidb::SQLStatement> minidb::Parser::Parse() {
+std::unique_ptr<minidb::SQLStatement> minidb::Parser::ParseStatement() {
     TokenType first_type = Peek().type_;
     std::unique_ptr<SQLStatement> ast = nullptr;
 
@@ -56,8 +56,78 @@ std::unique_ptr<minidb::SQLStatement> minidb::Parser::Parse() {
     if (!IsAtEnd()) {
         throw std::runtime_error("Syntax Error: Unexpected tokens at the end of the statement.");
     }
-
+    PrintAST(ast.get());
     return ast;
+}
+
+std::unique_ptr<minidb::AbstractExpression> minidb::Parser::ParseExpression() {
+    auto left=ParsePrimary();
+    while (IsCompareOp(Peek().type_)) {
+        auto compare_op=ToCompareOp(Advance().type_);
+        auto right=ParsePrimary();
+        left=std::make_unique<ComparisonExpression>(left.release(),right.release(),compare_op);
+    }
+    return left;
+}
+
+std::unique_ptr<minidb::AbstractExpression> minidb::Parser::ParsePrimary() {
+    if (Match(TokenType::IDENTIFIER)) {
+        std::string id=Last().text_;
+        return std::make_unique<ColumnValueExpression>(id);
+    }
+    else if (Match(TokenType::STRING)) {
+        return std::make_unique<ConstantValueExpression>(Value(Last().text_));
+    }
+    else if (Match(TokenType::NUMBER)) {
+        return std::make_unique<ConstantValueExpression>(Value(std::stoi(Last().text_)));
+    }
+    else if (Match(TokenType::KW_TRUE)) {
+        return std::make_unique<ConstantValueExpression>(Value(true));
+
+    }
+    else if (Match(TokenType::KW_FALSE)) {
+        return std::make_unique<ConstantValueExpression>(Value(false));
+    }
+    throw std::logic_error("unknown expression");
+}
+
+minidb::CompareOp minidb::Parser::ToCompareOp(TokenType tok_ty) {
+    switch (tok_ty) {
+        case TokenType::TK_LT:
+            return CompareOp::Lt;
+        case TokenType::TK_LE:
+            return CompareOp::Le;
+        case TokenType::TK_GT:
+            return CompareOp::Gt;
+        case TokenType::TK_GE:
+            return CompareOp::Ge;
+        case TokenType::TK_EQ:
+            return CompareOp::Eq;
+        case TokenType::TK_NEQ:
+            return CompareOp::Ne;
+        default:
+            throw std::runtime_error(" token is not compare op");
+    }
+
+}
+
+bool minidb::Parser::IsCompareOp(TokenType tok_ty) {
+    switch (tok_ty) {
+        case TokenType::TK_LT:
+        case TokenType::TK_LE:
+        case TokenType::TK_GT:
+        case TokenType::TK_GE:
+        case TokenType::TK_EQ:
+        case TokenType::TK_NEQ:
+            return true;
+        default:
+            return false;
+    }
+
+}
+
+minidb::Token minidb::Parser::Last() const {
+    return tokens_[cursor_-1];
 }
 
 minidb::Token minidb::Parser::Peek() const {
@@ -81,12 +151,22 @@ minidb::Token minidb::Parser::Consume(TokenType expected_type, const std::string
     throw std::runtime_error("Syntax Error: " + error_message + " (Got: '" + Peek().text_ + "')");
 }
 
+bool minidb::Parser::Match(TokenType expected_type) {
+    if (Peek().type_ == expected_type) {
+        Advance();
+        return true;
+    }
+    return false;
+}
+
 std::unique_ptr<minidb::SelectStatement> minidb::Parser::ParseSelect() {
     Consume(TokenType::KW_SELECT, "Expected 'SELECT'");
     Consume(TokenType::TK_STAR, "Currently only 'SELECT *' is supported");
     Consume(TokenType::KW_FROM, "Expected 'FROM' after '*'");
     Token table_name_token = Consume(TokenType::IDENTIFIER, "Expected table name after 'FROM'");
-
+    if (Match(TokenType::KW_WHERE)) {
+        return std::make_unique<SelectStatement>(table_name_token.text_,ParseExpression());
+    }
     return std::make_unique<SelectStatement>(table_name_token.text_);
 }
 
@@ -174,18 +254,39 @@ std::unique_ptr<minidb::CreateTableStatement> minidb::Parser::ParseCreateTable()
     Consume(TokenType::TK_RPAREN, "Expected ')' at the end of column definition");
     return std::make_unique<CreateTableStatement>(table_name,columns);
 }
-
+#include<format>
 void minidb::PrintAST(SQLStatement *ast, int indent)
 {
+    printf("======语法树节点======\n");
     std::string prefix(indent, ' ');
     if (ast->GetType() == StatementType::SELECT) {
         auto sel = static_cast<SelectStatement*>(ast);
-        std::cout << prefix << "[SelectStatement] 扫描表: " << sel->table_name_ << "\n";
+        if (sel->cond_) {
+            std::cout<<std::format("{}[SelectStatement] 扫描表: {}\n",prefix,sel->table_name_);
+            std::cout<<std::format("{}  └── 筛选条件节点:{}\n",prefix,sel->cond_->ToString());
+        }
+        else
+        std::cout<<std::format("{}[SelectStatement] 扫描表: {}\n",prefix,sel->table_name_);
+
     } else if (ast->GetType() == StatementType::INSERT) {
         auto ins = static_cast<InsertStatement*>(ast);
-        std::cout << prefix << "[InsertStatement] 写入目标表: " << ins->table_name_ << "\n";
-        std::cout << prefix << "  └── 数据来源子节点:\n";
-        PrintAST(ins->select_query_.get(), indent + 6);
+        std::cout<<std::format("{}[InsertStatement] 写入目标表: {}\n",prefix,ins->table_name_);
+
+
+        if (ins->has_values_) {
+            std::string data_str="VALUES(";
+            for (auto  &value:ins->raw_values_) {
+                data_str+=value.ToString();
+                data_str+=",";
+            }
+            data_str+=")";
+            std::cout<<std::format("{}  └── 数据来源子节点:{}\n",prefix,data_str);
+        }
+        else {
+            std::cout<<std::format("{}  └── 数据来源子节点:\n",prefix);
+            PrintAST(ins->select_query_.get(), indent + 6);
+        }
+
     }
     else if (ast->GetType()==StatementType::CREATE_TABLE) {
         static std::map<TypeId,std::string>type_strs={

@@ -6,6 +6,7 @@
 #include"table_heap.h"
 #include"tuple.h"
 #include"table_iterator.h"
+#include"expression.h"
 namespace minidb {
     class AbstractExecutor {
     public:
@@ -39,14 +40,25 @@ namespace minidb {
     public:
         explicit ValuesExecutor(const std::vector<Value>& values);
         void Init() override;
-
-        // 假设你的 Next 返回的是指针或 optional，这里以返回 std::unique_ptr<Tuple> 为例，
-        // 具体返回类型请根据你之前设计的 AbstractExecutor 保持一致。
         std::optional<Tuple> Next() override ;
     private:
         std::vector<Value> values_;
         bool done_ = false;
     };
+    class FilterExecutor:public AbstractExecutor {
+    public:
+        explicit FilterExecutor(AbstractExecutor*child,AbstractExpression *predicate,const Schema *schema);
+        void Init() override;
+        std::optional<Tuple> Next() override ;
+    private:
+        AbstractExecutor*child_;
+        AbstractExpression*predicate_;
+        const Schema*schema_;
+
+    };
+
+
+
 }
 
 

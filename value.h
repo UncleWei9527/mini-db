@@ -21,7 +21,13 @@ namespace minidb {
         // 构造一个字符串值
         explicit Value(std::string value);
         explicit Value(const char* value);
-
+        bool CompareEQ(const Value&other)const;
+        bool CompareNEQ(const Value&other)const;
+        bool CompareGT(const Value&other)const;
+        bool CompareGE(const Value&other)const;
+        bool CompareLT(const Value&other)const;
+        bool CompareLE(const Value&other)const;
+        bool CheckCompareValid(const Value&other)const;
         TypeId GetTypeId() const;
         bool IsNull() const;
         bool GetAsBool() const;
